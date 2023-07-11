@@ -1,0 +1,329 @@
+/*******************************************************************
+ * File:        module
+ * Purpose:     BlockDevices module interface
+ * Author:      Chris Johns
+ ******************************************************************/
+
+#include <stdlib.h>
+#include <stdio.h>
+
+#include "kernel.h"
+#include "swis.h"
+
+#include "modhead.h"
+#include "commands.h"
+#include "fans.h"
+#include "fan.h"
+
+
+/*******************************************************************
+ Function:      announce
+ Description:   Announce the startup or death of the module
+ Parameters:    started = 1 for starting, 0 for dying
+ Returns:       none
+ ******************************************************************/
+void announce(int started)
+{
+    if (started)
+    {
+        _swix(OS_ServiceCall, _INR(0, 1),
+                              API_VERSION, Service_FanControllerStarted);
+    }
+    else
+    {
+        _swix(OS_ServiceCall, _IN(1),
+                              Service_FanControllerDying);
+        pollword_trigger(trigger_dying);
+    }
+}
+
+
+/***************************************************************************
+ * Function:     Mod_Init
+ * Description:  Initialise the module, setting up vectors, callbacks and
+ *               any other parts of the system necessary for the module to
+ *               function.
+ * Parameters:   tail        = pointer to command line (control terminated)
+ *               podule_base = address of podule module was started from, or
+ *                             NULL if none
+ *               pw          = private word for module
+ * On exit:      Return NULL for successful initialisation, or a pointer to
+ *               an error block if the module could not start properly.
+ **************************************************************************/
+_kernel_oserror *Mod_Init(const char *tail, int podule_base, void *pw)
+{
+    if (fans_init())
+    {
+        /* Failed to start up? */
+        return err_InitFailed;
+    }
+
+    _swix(OS_AddCallBack, _INR(0, 1), StartupCallback_Entry, pw);
+    return NULL;
+}
+
+
+/***************************************************************************
+ * Function:     Mod_Final
+ * Description:  Finalise the module, shutting down any systems necessary,
+ *               freeing vectors and releasing workspace
+ * Parameters:   fatal       = fatality indicator; 1 if fatal, 0 if
+ *                             reinitialising
+ *               podule_base = address of podule module was started from, or
+ *                             NULL if none
+ *               pw          = private word for module
+ * On exit:      Return 0 for successful finalisation, or a pointer to an
+ *               error block if module was not shutdown properly.
+ **************************************************************************/
+_kernel_oserror *Mod_Final(int fatal, int podule_base, void *pw)
+{
+    _swix(OS_RemoveCallBack, _INR(0, 1), StartupCallback_Entry, pw);
+    fans_final();
+    return NULL;
+}
+
+
+/***************************************************************************
+ * Function:     StartupCallback_Handler
+ * Description:  Generic handler function
+ * Parameters:   r  = pointer to register block on entry
+ *               pw = private word for module
+ * On exit:      Update r to alter return values
+ *               Return NULL to return with V clear
+ *               Return an error pointer to set V and r0
+ **************************************************************************/
+_kernel_oserror *StartupCallback_Handler(_kernel_swi_regs *r, void *pw)
+{
+    announce(1);
+    return NULL;
+}
+
+
+/***************************************************************************
+ * Description:  Star command and help request handler routines.
+ * Parameters:   arg_string = pointer to argument string (control
+ *                            terminated), or output buffer
+ *               argc       = number of arguments passed
+ *               number     = command number (see CMD_* definitions below)
+ *               pw         = private word for module
+ * On exit:      If number indicates a help entry:
+ *                 To output, assemble zero terminated output into
+ *                 arg_string, and return help_PRINT_BUFFER to print it.
+ *                 To stay silent, return NULL.
+ *                 To given an error, return an error pointer.
+ *                 [In this case, you need to cast the 'const' away]
+ *               If number indicates a configure option:
+ *                 If arg_string is arg_STATUS, then print status, otherwise
+ *                 use argc and arg_string to set option.
+ *                 Return NULL for no error.
+ *                 Return one of the four error codes below (configure_*)
+ *                 for a generic error message.
+ *                 Return an error pointer for a custom error.
+ *               If number indicates a command entry:
+ *                 Execute the command given by number, and arg_string.
+ *                 Return NULL on success,
+ *                 Return a pointer to an error block on failure.
+ **************************************************************************/
+_kernel_oserror *Mod_Command(const char *arg_string, int argc, int number,
+                             void *pw)
+{
+    if (number == CMD_BlockDevices)
+        return Cmd_BlockDevices();
+    if (number == CMD_BlockDeviceInfo)
+        return Cmd_BlockDeviceInfo(arg_string, argc);
+    return NULL;
+}
+
+ ******************************************************************/
+_kernel_oserror *SWI_Version(int number, _kernel_swi_regs *r, void *pw)
+{
+    r->r[0] = API_VERSION;
+    return NULL;
+}
+
+/*************************************************** Gerph *********
+ Function:      return_faninfo
+ Description:   Return the information about a single fan
+ Parameters:    fan -> fan to return
+                regs-> the registers to populate
+ Returns:       none
+ ******************************************************************/
+void return_faninfo(fan_t *fan, _kernel_swi_regs *regs)
+{
+    regs->r[0] = (int)fan->fan_id;
+    regs->r[1] = (int)fan->location_id;
+    regs->r[2] = (int)fan->capabilities;
+    regs->r[3] = (int)fan->provider;
+    regs->r[4] = (int)fan->accuracy;
+    regs->r[5] = (int)fan->maximum;
+    regs->r[6] = (int)fan->speeds;
+}
+
+
+/*******************************************************************
+ Function:      SWI_Enumerate
+ Description:   Enumerate the fans that we have registered
+ Parameters:    number = SWI number
+                r -> registers block on entry for update
+                    =>  R0 = first call value, or 0 to start
+                    <=  R0 = -1 if not more, fan id
+                        R1 = Location identifier for this fan
+                        R2 = Capability flags for this fan
+                        R3 = Pointer to the provider name for this fan
+                        R4 = Speed accuracy, in RPM, or values 1-100 for
+                             duty-cycle control, or 0 for unknown accuracy
+                        R5 = Maximum supported speed in RPM, or 100 if fan
+                             uses duty-cycle control or can only be turned
+                             on and off, or -1 if unknown
+                        R6 = Pointer to a table of words describing the
+                             supported speeds, terminated by a -1 word,
+                             or 0 if arbitrary speeds (constrained by the
+                             accuracy) may be used.
+                pw -> module private word
+ Returns:       pointer to an error block if failed
+                NULL if successful
+ ******************************************************************/
+_kernel_oserror *SWI_Enumerate(int number, _kernel_swi_regs *r, void *pw)
+{
+    int fan_id = r->r[0];
+    fan_t *fan = fans_findfan_after(fan_id);
+    if (fan == NULL)
+    {
+        r->r[0] = -1;
+    }
+    else
+    {
+        return_faninfo(fan, r);
+    }
+
+    return NULL;
+}
+
+/*******************************************************************
+ Function:      SWI_Info
+ Description:   Return information about a specific fan.
+ Parameters:    number = SWI number
+                r -> registers block on entry for update
+                    =>  R0 = fan id to return
+                    <=  R0 preserved
+                        R1 = Location identifier for this fan
+                        R2 = Capability flags for this fan
+                        R3 = Pointer to the provider name for this fan
+                        R4 = Speed accuracy, in RPM, or values 1-100 for
+                             duty-cycle control, or 0 for unknown accuracy
+                        R5 = Maximum supported speed in RPM, or 100 if fan
+                             uses duty-cycle control or can only be turned
+                             on and off, or -1 if unknown
+                        R6 = Pointer to a table of words describing the
+                             supported speeds, terminated by a -1 word,
+                             or 0 if arbitrary speeds (constrained by the
+                             accuracy) may be used.
+                pw -> module private word
+ Returns:       pointer to an error block if failed
+                NULL if successful
+ ******************************************************************/
+_kernel_oserror *SWI_Info(int number, _kernel_swi_regs *r, void *pw)
+{
+    int fan_id = r->r[0];
+    fan_t *fan = fans_findfan(fan_id);
+    if (fan == NULL)
+        return err_BadFan;
+
+    return_faninfo(fan, r);
+
+    return NULL;
+}
+
+/*******************************************************************
+ Function:      SWI_DeviceOp
+ Description:   Read or control the speed of the fan
+ Parameters:    number = SWI number
+                r -> registers block on entry for update
+                    =>  R0 =  device id
+                        R1 =  operation code
+                        R2 -> unsigned 64bit device LBA
+                        R3 -> memory for read/write
+                        R4 =  LBA count
+                pw -> module private word
+ Returns:       pointer to an error block if failed
+                NULL if successful
+ ******************************************************************/
+_kernel_oserror *SWI_DeviceOp(int number, _kernel_swi_regs *r, void *pw)
+{
+    device_t *device = devices_find(r->r[0]);
+    if (device == NULL)
+        return err_BadDevice;
+
+    printf("DeviceOp called\n");
+    return NULL;
+}
+
+/*******************************************************************
+ Function:      SWI_Register
+ Description:   Register a new block device
+ Parameters:    number = SWI number
+                r -> registers block on entry for update
+                    => R0  = Pointer to driver code entry point
+                       R1  = Workspace value to pass in R12 to the entry point
+                       R2  = Type identifier for this device
+                       R3  = Location identifier for this device
+                       R4  = Feature flags for this device
+                       R5 -> Name of the device 
+                       R6 -> 64 bit value of the number of blocks on the device
+                       R7  = Size of each block
+                    <= R0  = device identifier allocated
+                pw -> module private word
+ Returns:       pointer to an error block if failed
+                NULL if successful
+ ******************************************************************/
+_kernel_oserror *SWI_Register(int number, _kernel_swi_regs *r, void *pw)
+{
+    void *driver_code = (void *)r->r[0];
+    void *driver_ws = (void *)r->r[1];
+    unsigned long type_id = (unsigned long)r->r[2];
+    unsigned long location_id = (unsigned long)r->r[3];
+    unsigned long features = (unsigned long)r->r[4];
+    const char *name = (const char *)r->r[5];
+    unsigned long *blocks = (unsigned long*)r->r[6];
+    unsigned long block_size = (unsigned long)r->r[7];
+
+    device_t *dev = device_create(
+        type_id, location_id, featues, name,
+        blocks, blcok_size,
+        driver_code, driver_ws);
+
+    if (dev == NULL)
+        return err_RegisterFailed;
+
+    if (devices_register(dev))
+    {
+        /* Failed to register */
+        device_destroy(dev);
+        return err_RegisterFailed;
+    }
+
+    r->r[0] = dev->device_id;
+    return NULL;
+}
+
+/*******************************************************************
+ Function:      SWI_Deregister
+ Description:   Deregister a fan from the FanController
+ Parameters:    number = SWI number
+                r -> registers block on entry for update
+                    => R0 = Device identifier to deregister
+                pw -> module private word
+ Returns:       pointer to an error block if failed
+                NULL if successful
+ ******************************************************************/
+_kernel_oserror *SWI_Deregister(int number, _kernel_swi_regs *r, void *pw)
+{
+    int device_id = r->r[0];
+
+    if (devices_deregister(device_id))
+    {
+        return err_BadDevice;
+    }
+
+    return NULL;
+}

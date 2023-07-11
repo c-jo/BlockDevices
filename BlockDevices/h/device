@@ -1,0 +1,60 @@
+/*******************************************************************
+ * File:        device
+ * Purpose:     Management of a single device
+ * Author:      Chris Johns
+ ******************************************************************/
+
+#ifndef DEVICE_H
+#define DEVICE_H
+
+#include "BlockDevices.h"
+
+typedef struct device_s {
+    struct device_ *    next;
+
+    int                 device_id;
+    unsigned long       type_id;
+    unsigned long       location_id;
+    unsigned long       features;
+    char *              identity;
+    uint64_t            blocks;
+    uint32_t            block_size;
+    void *driver_code;
+    void *driver_ws;
+} device_t;
+
+
+/*******************************************************************
+ Function:      device_create
+ Description:   Create a reference to a device
+ Parameters:    type_id = type of the device
+                location_id = location of the device
+                features = features flags
+                identity -> device identity name (will be copied)
+                blocks = number of blocks on the device
+                block_size = size of block
+                driver_code -> the code to call for the driver
+                driver_ws -> r12 value for the driver
+ Returns:       pointer to the fan_t, or NULL if failed
+ ******************************************************************/
+device_t *device_create(
+              unsigned long   type_id,
+              unsigned long   location_id,
+              unsigned long   feaatures,
+              const char *    identity,
+              uint64_t        blocks,
+              uint32_t        block_size,
+              void *          driver_code,
+              void *          driver_ws);
+
+/*******************************************************************
+ Function:      device_destroy
+ Description:   Destroy the fan
+ Parameters:    device > the device we're destroying (assumed to 
+                         already have been unlinked).
+ Returns:       none
+ ******************************************************************/
+void device_destroy(device_t *device);
+
+
+#endif
