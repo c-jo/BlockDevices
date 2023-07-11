@@ -1,0 +1,13 @@
+/artifacts/
+/ci-logs/
+/riscos-build/
+**/aif/
+**/aif32/
+**/o/
+**/o32/
+**/oz/*
+**/oz32/*
+**/rm/*
+**/rm32/*
+BlockDevices/h/modhead
+BlockDeiceDummy/h/modhead

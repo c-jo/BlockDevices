@@ -1,0 +1,78 @@
+# Definition for CI within GitLab
+# Note:
+#    Prefix any job name with a '.' to disable.
+#
+
+
+# Enable submodules
+variables:
+  GIT_STRATEGY: clone
+  GIT_SUBMODULE_STRATEGY: none
+
+
+# Common definitions for the jobs
+.common: &common
+  artifacts:
+    when: always
+    paths:
+      - FanController/rm32
+      - FanController/built/docs
+      - FanDriverDummy/rm32
+  dependencies: []
+
+
+#### Builds ####
+build-modules-riscos:
+  # Builds using the cross-compiling toolchain
+  <<: *common
+  stage: build
+  script:
+    - xsltproc --version || { apt-get update && apt-get install -y xsltproc ; }
+    - cd FanController
+    - riscos-amu ram BUILD32=1
+    - riscos-amu export BUILD32=1
+    - riscos-amu docs BUILD32=1
+    - cd ../FanDriverDummy
+    - riscos-amu ram BUILD32=1
+  tags:
+    - riscos
+
+build-modules-robuild:
+  # Builds using the RISC OS Build service.
+  stage: build
+  script:
+    - |
+      set -o pipefail
+      # Zip up the source to send to robuild
+      zip -q9r /tmp/source-archive.zip * .robuild.yaml
+      # Fetch the build client
+      curl -s -L -o riscos-build-online https://github.com/gerph/robuild-client/releases/download/v0.05/riscos-build-online && chmod +x riscos-build-online
+      # Send the archive file to build service
+      ./riscos-build-online -i /tmp/source-archive.zip -a off -t 240 -o /tmp/built
+
+    - |
+      if [[ -f FanController/VersionNum ]] ; then
+          version=$(sed '/MajorVersion / ! d ; s/.*MajorVersion *"\(.*\)"/\1/' FanController/VersionNum)
+      else
+          version=$(git rev-parse --short HEAD)
+      fi
+      echo "This is version: $version"
+      if [ -f /tmp/built,a91 ] ; then
+          cp /tmp/built,a91 "FanController-$version.zip"
+      else
+          echo "No archive was built?"
+          exit 1
+      fi
+
+  artifacts:
+      when: always
+      paths:
+          - FanController-*.zip
+
+  tags:
+    - linux
+
+
+#### Stages to execute ####
+stages:
+  - build
