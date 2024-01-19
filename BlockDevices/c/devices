@@ -1,0 +1,185 @@
+/*******************************************************************
+ * File:        devices
+ * Purpose:     Management of block devices
+ * Author:      Chris Johns
+ ******************************************************************/
+
+#include <stdlib.h>
+#include "kernel.h"
+
+#include "devices.h"
+#include <stdio.h>
+
+#include "swis.h"
+
+static struct {
+    int next_id;
+    device_t* devices;
+    device_t** tailp;
+} devices;
+
+
+
+/*******************************************************************
+ Function:      devices_notify_announce
+ Description:   Announce the starting, or dying, of a device
+ Parameters:    device-> the device to announce
+                started = 1 if started; 0 if dying
+ Returns:       none
+ ******************************************************************/
+static void device_notify_announce(device_t *device, int started)
+{
+    _swix(OS_ServiceCall, _INR(0, 2),
+                          started ? Service_BlockDevices_DeviceAdded
+                                  : Service_BlockDevices_DeviceRemoved,
+                          Service_BlockDevices,
+                          device->device_id);
+}
+
+/*******************************************************************
+ Function:      devices_init
+ Description:   Initialise the block devices system
+ Parameters:    none
+ Returns:       0 if successful; 1 if failed
+ ******************************************************************/
+int devices_init(void)
+{
+    devices.next_id = 1;
+    devices.devices = NULL;
+    devices.tailp = &devices.devices;
+
+    return 0;
+}
+
+/*******************************************************************
+ Function:      devices_final
+ Description:   Finalise the devices system
+ Parameters:    none
+ Returns:       0 if successful; 1 if failed
+ ******************************************************************/
+int devices_final(void)
+{
+    device_t *device = devices.devices;
+    devices.devices = NULL;
+    devices.tailp = &devices.devices;
+
+    while (device)
+    {
+        device_t *next = device->next;
+        device_notify_announce(device, 0);
+        device_destroy(device);
+        device = next;
+    }
+
+    return 0;
+}
+
+/*******************************************************************
+ Function:      devices_register
+ Description:   Register a device with the system
+ Parameters:    device-> the device that we're registering
+ Returns:       0 if successful; 1 if failed
+ ******************************************************************/
+int devices_register(device_t *device)
+{
+    device->device_id = devices.next_id++;
+    /* FIXME: If we've wrapped, this is not sufficient; we need to find a gap - this case is unlikely
+     *        so I don't care for now.
+     */
+
+    printf("registering device %p (%s - %s)\n", (void*)device, device->info.manufacturer, device->info.serial_number);
+    device->next = NULL;
+
+    /* Attach to the end of the devices list */
+    *devices.tailp = device;
+
+    /* Issue service that we have a new device */
+    device_notify_announce(device, 1);
+    return 0;
+}
+
+
+/*******************************************************************
+ Function:      devices_deregister
+ Description:   Deregister a device from the system
+ Parameters:    device-> the device that we're registering
+ Returns:       0 if successful; 1 if failed
+ ******************************************************************/
+int devices_deregister(int device_id)
+{
+    device_t *cur = devices.devices;
+    device_t **lastp = &devices.devices;
+
+    while (cur && cur->device_id != device_id)
+    {
+        lastp = &cur->next;
+        cur = cur->next;
+    }
+    if (cur == NULL)
+    {
+        /* We reached the end of the list without finding the device - failed */
+        return 1;
+    }
+
+    /* We found the device in our list; remove it */
+    if (&cur->next == devices.tailp)
+    {
+        /* This was the last entry on the list; so move the tail pointer */
+        devices.tailp = lastp;
+    }
+    *lastp = cur->next; /* unlinks from the list */
+
+    /* Issue service that we have removed a device */
+    device_notify_announce(cur, 0);
+
+    /* Finally free the memory */
+    device_destroy(cur);
+    return 0;
+}
+
+
+/*******************************************************************
+ Function:      devices_finddevice
+ Description:   Find a device given the device_id
+ Parameters:    device_id = device id to find
+ Returns:       pointer to the device, if found
+                NULL if not found
+ ******************************************************************/
+device_t *devices_find(int device_id)
+{
+    device_t *cur;
+
+    for (cur=devices.devices;
+         cur && cur->device_id != device_id;
+         cur=cur->next)
+        ; /* Search is in the for loop */
+
+    return cur;
+}
+
+
+/*******************************************************************
+ Function:      devices_finddevice_after
+ Description:   Find a device AFTER a given the device_id
+ Parameters:    device_id = device id to find the device after, or 0 for the first one
+ Returns:       pointer to the next device, if found
+                NULL if no more devices found
+ ******************************************************************/
+device_t *devices_after(device_t *device)
+{
+    unsigned long device_id = device ? device->device_id : 0;
+    device_t *cur;
+
+    for (cur=devices.devices;
+         cur;
+         cur=cur->next)
+    {
+        if (device_id == 0)
+            break;
+
+        if (cur->device_id == device_id)
+            device_id = 0;
+    }
+
+    return cur;
+}

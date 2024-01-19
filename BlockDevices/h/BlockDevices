@@ -1,0 +1,93 @@
+/*******************************************************************
+ * File:        BlockDevice
+ * Purpose:     Constants for accessing the block driver interfaces
+ * Author:      Chris Johns
+ ******************************************************************/
+
+#ifndef BlockDevice_H
+#define BlockDevice_H
+
+#ifndef CMHG
+#define USE_LONG_LONG
+#include "LongLong/longlong.h"
+
+// Invalid device id
+#define DeviceId_Invalid (0)
+
+// Block device info block
+typedef struct device_info_s {
+    unsigned   device_flags;
+    unsigned   interface_type:16;
+    unsigned   media_type:16;
+    unsigned   parent_device;
+    unsigned   partition_scheme:8;
+    unsigned   partition_index:24;
+    unsigned   partition_type;
+    longlong_t block_count;
+    unsigned   block_size;
+    char *     manufacturer;
+    char *     serial_number;
+} device_info_t;
+
+// Interface types
+typedef enum interface_type_e {
+    BlockDevice_Interface_Unknown = 0,
+    BlockDevice_Interface_FDC = 1,
+    BlockDevice_Interface_ST506 = 2,
+    BlockDevice_Interface_IDE = 3,
+    BlockDevice_Interface_SATA = 4,
+    BlockDevice_Interface_SCSI = 5,
+    BlockDevice_Interface_USB = 6,
+    BlockDevice_Interface_NVMe = 7
+} interface_type_t;
+
+// Media types
+typedef enum media_type_e {
+    BlockDevice_Media_Unknown = 0,
+    BlockDevice_Media_FloppyDisc = 1,
+    BlockDevice_Media_HardDisc = 2,
+    BlockDevice_Media_Optical = 3,
+    BlockDevice_Media_SSD = 4
+} media_type_type_t;
+
+// Partition schemes
+typedef enum partition_scheme_e {
+    BlockDevice_PartitionScheme_None = 0,
+    BlockDevice_PartitionScheme_MBR = 1,
+    BlockDevice_PartitionScheme_GPT = 2
+} partition_scheme_t;
+
+// Used to control read / writes
+typedef struct transfer_block_s {
+  //uint64_t lba;
+  longlong_t lba;
+  void * address;
+  unsigned count;
+} transfer_block_t;
+
+#endif
+
+// Service calls - **NOT UET REGISTERED**
+#define Service_BlockDevices (0x88000)
+#define Service_BlockDevices_Started (0)
+#define Service_BlockDevices_Dying (1)
+#define Service_BlockDevices_DeviceAdded (2)
+#define Service_BlockDevices_DeviceRemoved (3)
+
+// Error numbers - **NOT YET REGISTERED**
+#define ErrorBase_BlockDevice (0x880000)
+#define ErrorNumber_NoSuchDevice (ErrorBase_BlockDevice + 0)
+#define ErrorNumber_DeviceInUse (ErrorBase_BlockDevice + 1)
+
+// SWI numbers - **NOT YET REGISTERED*
+#ifndef BlockDevice_Enumerate
+#define BlockDevice_0 (0x5F000)
+#define BlockDevice_Enumerate (BlockDevice_0 + 0)
+#define BlockDevice_Read (BlockDevice_0 + 1)
+#define BlockDevice_Write (BlockDevice_0 + 2)
+#define BlockDevice_Register (BlockDevice_0 + 16)
+#define BlockDevice_Deregister (BlockDevice_0 + 17)
+
+#endif
+
+#endif
