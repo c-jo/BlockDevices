@@ -1,25 +1,20 @@
 /*******************************************************************
  * File:        device
- * Purpose:     Management of a single device
+ * Purpose:     Management of a single device and its interfaces
  * Author:      Chris Johns
  ******************************************************************/
 
-#ifndef DEVICE_H
-#define DEVICE_H
+#include <stdlib.h>
+#include <string.h>
 
-#define USE_LONG_LONG
-#include "LongLong/longlong.h"
+#include "callx.h"
+#include "fortify.h"
 
-#include "BlockDevices.h"
+/* #include "BlockDevices.h" */
+#include "device.h"
+#include "str.h"
 
-typedef struct device_s {
-    struct device_s * next;
-    unsigned long     device_id;
-    device_info_t     info;
-    void *            driver_code;
-    void *            driver_ws;
-} device_t;
-
+#include <stdio.h>
 
 /*******************************************************************
  Function:      device_create
@@ -34,7 +29,29 @@ typedef struct device_s {
 device_t *device_create(
               device_info_t * info,
               void *          driver_code,
-              void *          driver_ws);
+              void *          driver_ws)
+{
+    device_t *device;
+
+    device = calloc(1, sizeof(*device));
+    if (device == NULL)
+        goto failed;
+
+    memcpy(&device->info, info, sizeof(device->info));
+    // TODO: strdup the srings
+
+    device->driver_code = driver_code;
+    device->driver_ws = driver_ws;
+
+    return device;
+
+failed:
+    if (device)
+    {
+        free(device);
+    }
+    return NULL;
+}
 
 /*******************************************************************
  Function:      device_destroy
@@ -43,7 +60,11 @@ device_t *device_create(
                       been unlinked).
  Returns:       none
  ******************************************************************/
-void device_destroy(device_t *device);
+void device_destroy(device_t *device)
+{
+    free(device);
+}
+
 
 /*******************************************************************
  Function:      device_read
@@ -54,7 +75,13 @@ void device_destroy(device_t *device);
  Returns:       pointer to an error block if failed
                 NULL if successful
  ******************************************************************/
-_kernel_oserror *device_read(device_t *device, unsigned long flags, transfer_block_t *block);
+_kernel_oserror * device_read(device_t *device, unsigned long flags, transfer_block_t *block)
+{
+    return _callx(device->driver_code, device->driver_ws,
+                 _INR(0, 3),
+                 1, device->device_id, flags, block);
+}
+
 
 /*******************************************************************
  Function:      device_write
@@ -65,6 +92,9 @@ _kernel_oserror *device_read(device_t *device, unsigned long flags, transfer_blo
  Returns:       pointer to an error block if failed
                 NULL if successful
  ******************************************************************/
-_kernel_oserror *device_write(device_t *device, unsigned long flags, transfer_block_t *block);
-
-#endif
+_kernel_oserror * device_write(device_t *device, unsigned long flags, transfer_block_t *block)
+{
+    return _callx(device->driver_code, device->driver_ws,
+                 _INR(0, 3),
+                 1, device->device_id, flags, block);
+}

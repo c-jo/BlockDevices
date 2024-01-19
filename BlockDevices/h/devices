@@ -1,0 +1,77 @@
+/*******************************************************************
+ * File:        device
+ * Purpose:     Management of multiple device
+ * Author:      Gerph
+ ******************************************************************/
+
+#ifndef DEVICES_H
+#define DEVICES_H
+
+#include "device.h"
+
+/*
+typedef struct device_s {
+    int         next_fan_id;
+    fan_t *     device;
+    fan_t **    devicetailp;
+} device_t;
+*/
+
+
+/*******************************************************************
+ Function:      devices_init
+ Description:   Initialise the device system
+ Parameters:    none
+ Returns:       0 if successful; 1 if failed
+ ******************************************************************/
+int devices_init(void);
+
+
+/*******************************************************************
+ Function:      devices_final
+ Description:   Finalise the device system
+ Parameters:    none
+ Returns:       0 if successful; 1 if failed
+ ******************************************************************/
+int devices_final(void);
+
+
+/*******************************************************************
+ Function:      device_register
+ Description:   Register a device with the system
+ Parameters:    device -> the device that we're registering
+ Returns:       0 if successful; 1 if failed
+ ******************************************************************/
+int devices_register(device_t *device);
+
+
+/*******************************************************************
+ Function:      device_deregister
+ Description:   Deregister a fan from the system
+ Parameters:    fan-> the fan that we're registering
+ Returns:       0 if successful; 1 if failed
+ ******************************************************************/
+int devices_deregister(int device_id);
+
+
+/*******************************************************************
+ Function:      devices_find
+ Description:   Find a device given the device_id
+ Parameters:    device_id = device id to find
+ Returns:       pointer to the device, if found
+                NULL if not found
+ ******************************************************************/
+device_t *devices_find(int device_id);
+
+
+/*******************************************************************
+ Function:      devices_after
+ Description:   Find the device AFTER the given one
+ Parameters:    device -> device to find the one after, or NULL
+                to find first device.
+ Returns:       pointer to the next device,
+                NULL if no more device found
+ ******************************************************************/
+device_t *devices_after(device_t *device);
+
+#endif

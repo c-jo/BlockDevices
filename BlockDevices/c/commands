@@ -1,0 +1,91 @@
+/*******************************************************************
+ * File:        commands
+ * Purpose:     Implementation of the *Commands
+ * Author:      Gerph
+ ******************************************************************/
+
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include "kernel.h"
+#include "swis.h"
+
+#include "modhead.h"
+#include "commands.h"
+#include "devices.h"
+
+typedef struct idmessages_s {
+    int num;
+    const char *message;
+} idmessages_t;
+#define IDMESSAGE_LAST (-1)
+
+
+static idmessages_t interface_names[] = {
+    { BlockDevice_Interface_Unknown, "-" },
+    { BlockDevice_Interface_FDC, "FDC" },
+    { BlockDevice_Interface_ST506, "ST506" },
+    { BlockDevice_Interface_IDE, "ATA" },
+    { BlockDevice_Interface_SATA, "SATA" },
+    { BlockDevice_Interface_SCSI, "SCSI" },
+    { BlockDevice_Interface_USB, "USB" },
+    { BlockDevice_Interface_NVMe, "NVMe" },
+    { IDMESSAGE_LAST }
+    };
+
+
+
+/*******************************************************************
+ Function:      lookup_description
+ Description:   Look up a descriptions in a table.
+ Parameters:    num = number to lookup
+                msgs-> the table of messages (idmessages_t list)
+                def-> the default message
+ Returns:       pointer to the message, or def if no value found.
+ ******************************************************************/
+const char *lookup_description(int num, idmessages_t *msgs, const char *def)
+{
+    /* FIXME: Internationalising these message lookups could be done here if we cared */
+    while (msgs->num != IDMESSAGE_LAST)
+    {
+        if (msgs->num == num)
+            return msgs->message;
+        msgs++;
+    }
+    return def;
+}
+
+
+/*******************************************************************
+ Function:      Cmd_BlockDevices
+ Description:   Display information about the fans
+ Parameters:    none
+ Returns:       pointer to an error block if failed
+                NULL if successful
+ ******************************************************************/
+_kernel_oserror *Cmd_BlockDevices(void)
+{
+    device_t *device;
+
+    for (device = 0; (device=devices_after(device)) != NULL; )
+    {
+        printf("%5i : %-24s  %-32s  %-9s  %s\n",
+               device->device_id, device->info.manufacturer, device->info.serial_number, "", "");
+    }
+
+
+/*
+    for (device_id = 0; (device=devices_find_after(device_id)) != NULL; device_id = device->device_id)
+    {
+        //const char *location;
+        //const char *control;
+
+        //location = location_name(fan->location_id);
+        //control = control_name(fan_getcontrol(fan));
+
+        printf("%5i : %-24s  %-32s  %-9s  %s\n",
+               device_id, "Your", "Message", "Goes", "Here");
+    }
+*/
+    return NULL;
+}
