@@ -1,7 +1,7 @@
 /*******************************************************************
  * File:        device
  * Purpose:     Management of multiple device
- * Author:      Gerph
+ * Author:      Chris Johns
  ******************************************************************/
 
 #ifndef DEVICES_H

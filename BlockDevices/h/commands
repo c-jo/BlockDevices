@@ -1,7 +1,7 @@
 /*******************************************************************
  * File:        commands
  * Purpose:     Implementation of the *Commands
- * Author:      Gerph
+ * Author:      Chris Johns
  ******************************************************************/
 
 #ifndef COMMANDS_H
