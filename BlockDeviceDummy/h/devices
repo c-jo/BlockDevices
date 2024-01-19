@@ -1,0 +1,41 @@
+/*******************************************************************
+ * File:        devices
+ * Purpose:     Device registration and management
+ * Author:      Chris Jonhns
+ ******************************************************************/
+
+#ifndef devices_H
+#define devices_H
+
+#include "device.h"
+
+/*******************************************************************
+ Function:      devices_register
+ Description:   Register the devices we supply with the BlockDevices module
+ Parameters:    pw = our private word
+ Returns:       none
+ ******************************************************************/
+void devices_register(void *pw);
+
+/*******************************************************************
+ Function:      devices_deregister
+ Description:   Deregister the devices we supply with the BlockDevices module
+                and shut them down
+ Parameters:    pw = our private word
+                call_deregister = 1 if we should actually deregister the
+                                    devices
+                                  0 if we should just shut them down
+                                    (because the module is already dead)
+ Returns:       none
+ ******************************************************************/
+void devices_deregister(void *pw, int call_deregister);
+
+/*******************************************************************
+ Function:      devices_find
+ Description:   Given the device_id, return the device structure
+ Parameters:    device_id = device_id to look for
+ Returns:       device structure, or NULL if not valid
+ ******************************************************************/
+device_t *devices_find(int device_id);
+
+#endif

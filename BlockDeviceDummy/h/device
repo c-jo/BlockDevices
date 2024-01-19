@@ -1,0 +1,60 @@
+/*******************************************************************
+ * File:        device
+ * Purpose:     device interfacing
+ * Author:      Chris Johns
+ ******************************************************************/
+
+#ifndef DEVICE_H
+#define DEVICE_H
+
+#include "BlockDevices.h"
+
+/* Information about the device */
+typedef struct device_s {
+    int device_id;
+    device_info_t info;
+    /* Add additional hardware specific details here */
+} device_t;
+
+
+
+/*******************************************************************
+ Function:      device_open
+ Description:   Open the connection to a device
+                If we were successful, device_alive will return true.
+                If we're not, we won't get registered.
+ Parameters:    device -> the device data
+ Returns:       none
+ ******************************************************************/
+void device_open(device_t *device);
+
+
+/*******************************************************************
+ Function:      device_close
+ Description:   Close the connection to a device
+                From here on, device_alive will report false.
+ Parameters:    device -> the device data
+ Returns:       none
+ ******************************************************************/
+void device_close(device_t *device);
+
+
+
+/*******************************************************************
+ Function:      device_read
+ Description:   Read the current speed
+ Parameters:    device -> the device data
+ Returns:       current speed
+ ******************************************************************/
+int device_read(device_t *device);
+
+/*******************************************************************
+ Function:      device_setspeed
+ Description:   Set the speed for the device
+ Parameters:    device -> the device data
+                speed = new speed to select
+ Returns:       current speed
+ ******************************************************************/
+int device_write(device_t *device);
+
+#endif

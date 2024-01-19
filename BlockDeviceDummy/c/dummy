@@ -1,0 +1,35 @@
+/*******************************************************************
+ * File:        devices
+ * Purpose:     Device registration and management
+ * Author:      Chris Johns
+ ******************************************************************/
+
+#include <stdio.h>
+
+#include "device.h"
+
+/*******************************************************************
+ Function:      devices_register
+ Description:   Register the devices we supply with the BlockDevices module
+ Parameters:    pw = our private word
+ Returns:       none
+ ******************************************************************/
+void device_open(device_t *device)
+{
+    printf("device_open\n");
+    device->info.block_count.lo = 1000000;
+    device->info.block_size = 512;
+    device->info.manufacturer = "Dummy Devices Ltd";
+    device->info.serial_number = "01234567";
+}
+
+/*******************************************************************
+ Function:      devices_register
+ Description:   Register the devices we supply with the BlockDevices module
+ Parameters:    pw = our private word
+ Returns:       none
+ ******************************************************************/
+void device_close(device_t *device)
+{
+    printf("device_close\n");
+}
