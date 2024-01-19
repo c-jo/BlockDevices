@@ -1,0 +1,3 @@
+Dir <Obey$Dir>
+WimpSlot -Min 2m
+amu BUILD32=1 THROWBACK=-throwback
