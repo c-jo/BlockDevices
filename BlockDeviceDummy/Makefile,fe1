@@ -18,21 +18,21 @@ COMPONENT  = BlockDeviceDummy
 #   ${EXP_C_H}.${COMPONENT}SWIs
 # To export to the library in a subdirectory, use an export like:
 #   ${EXP_LIB}.${COMPONENT}.h.myheader
-EXPORTS    =
+# EXPORTS    = ${EXP_C_H}.${COMPONENT}
 
 # Resources you want to be exported as part of the 'resources' phase of the build
 #RESOURCES  = ${RESDIR}.${COMPONENT}.Messages
 
 # Comma-separated list of paths to use for includes, such as:
 #	C:LibName.
-INCLUDES   =
+INCLUDES   = C:LongLong
 
 # Space separated list of libraries to link against.
 # (${CLIB} is implicit, unless NOCLIB = yes)
 LIBS       =
 
 # Space separated list of defines to set, eg -DDEBUG
-CDEFINES   =
+CDEFINES   = -DUSE_LONG_LONG
 
 # Objects to build, using the format o.<name> (will be varied for build type)
 OBJS       = o.modhead \

@@ -20,7 +20,7 @@ typedef struct idmessages_s {
 } idmessages_t;
 #define IDMESSAGE_LAST (-1)
 
-
+/*
 static idmessages_t interface_names[] = {
     { BlockDevice_Interface_Unknown, "-" },
     { BlockDevice_Interface_FDC, "FDC" },
@@ -31,9 +31,8 @@ static idmessages_t interface_names[] = {
     { BlockDevice_Interface_USB, "USB" },
     { BlockDevice_Interface_NVMe, "NVMe" },
     { IDMESSAGE_LAST }
-    };
-
-
+};
+*/
 
 /*******************************************************************
  Function:      lookup_description
@@ -69,23 +68,13 @@ _kernel_oserror *Cmd_BlockDevices(void)
 
     for (device = 0; (device=devices_after(device)) != NULL; )
     {
-        printf("%5i : %-24s  %-32s  %-9s  %s\n",
-               device->device_id, device->info.manufacturer, device->info.serial_number, "", "");
+        printf("%5i : %-8s  %-24s  %-32s  %-9s  %s\n",
+               (int)device->device_id,
+               "",
+               device->info.manufacturer ? device->info.manufacturer : "",
+               device->info.product      ? device->info.product      : "",
+               device->info.serial       ? device->info.serial       : "",
+               device->info.firmware     ? device->info.firmware     : "");
     }
-
-
-/*
-    for (device_id = 0; (device=devices_find_after(device_id)) != NULL; device_id = device->device_id)
-    {
-        //const char *location;
-        //const char *control;
-
-        //location = location_name(fan->location_id);
-        //control = control_name(fan_getcontrol(fan));
-
-        printf("%5i : %-24s  %-32s  %-9s  %s\n",
-               device_id, "Your", "Message", "Goes", "Here");
-    }
-*/
     return NULL;
 }

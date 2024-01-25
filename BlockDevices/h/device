@@ -7,9 +7,6 @@
 #ifndef DEVICE_H
 #define DEVICE_H
 
-#define USE_LONG_LONG
-#include "LongLong/longlong.h"
-
 #include "BlockDevices.h"
 
 typedef struct device_s {
