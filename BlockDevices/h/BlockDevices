@@ -8,25 +8,33 @@
 #define BlockDevice_H
 
 #ifndef CMHG
-#define USE_LONG_LONG
-#include "LongLong/longlong.h"
+#ifdef USE_LONG_LONG
+// longlong.h defines USE_LONG_LONG itself
+#undef USE_LONG_LONG
+#include "longlong.h"
+#define UINT64 longlong_t
+#else
+#define UINT64 uint64_t
+#endif
 
 // Invalid device id
 #define DeviceId_Invalid (0)
 
 // Block device info block
 typedef struct device_info_s {
-    unsigned   device_flags;
-    unsigned   interface_type:16;
-    unsigned   media_type:16;
-    unsigned   parent_device;
-    unsigned   partition_scheme:8;
-    unsigned   partition_index:24;
-    unsigned   partition_type;
-    longlong_t block_count;
-    unsigned   block_size;
-    char *     manufacturer;
-    char *     serial_number;
+    unsigned  device_flags;
+    unsigned  interface_type:16;
+    unsigned  media_type:16;
+    unsigned  parent_device;
+    unsigned  partition_scheme:8;
+    unsigned  partition_index:24;
+    unsigned  partition_type;
+    UINT64    block_count;
+    unsigned  block_size;
+    char *    manufacturer;
+    char *    product;
+    char *    serial;
+    char *    firmware;
 } device_info_t;
 
 // Interface types
@@ -59,9 +67,8 @@ typedef enum partition_scheme_e {
 
 // Used to control read / writes
 typedef struct transfer_block_s {
-  //uint64_t lba;
-  longlong_t lba;
-  void * address;
+  UINT64   lba;
+  void *   address;
   unsigned count;
 } transfer_block_t;
 

@@ -86,8 +86,6 @@ int devices_register(device_t *device)
     /* FIXME: If we've wrapped, this is not sufficient; we need to find a gap - this case is unlikely
      *        so I don't care for now.
      */
-
-    printf("registering device %p (%s - %s)\n", (void*)device, device->info.manufacturer, device->info.serial_number);
     device->next = NULL;
 
     /* Attach to the end of the devices list */

@@ -15,7 +15,7 @@
 #include "devices.h"
 
 // Are we up and running yet? (has startup been announced)
-static int running; 
+static int running;
 
 /*******************************************************************
  Function:      announce
@@ -223,8 +223,9 @@ _kernel_oserror *SWI_Write(int number, _kernel_swi_regs *r, void *pw)
     if (device == NULL)
         return err_BadDevice;
 
-    printf("SWI_Write called\n");
-    return NULL;
+    return device_write(device,
+                        (unsigned long)r->r[1],
+                        (transfer_block_t*)r->r[2]);
 }
 
 /*******************************************************************
@@ -263,7 +264,7 @@ _kernel_oserror *SWI_Register(int number, _kernel_swi_regs *r, void *pw)
         return err_RegisterFailed;
     }
 
-    r->r[0] = dev->device_id;
+    r->r[0] = (int)dev->device_id;
     return NULL;
 }
 
