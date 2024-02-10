@@ -1,0 +1,101 @@
+/*******************************************************************
+ * File:        devices
+ * Purpose:     Device registration and management
+ * Author:      Chris Johns
+ ******************************************************************/
+
+#include <stdlib.h>
+#include "kernel.h"
+#include "swis.h"
+
+#include "device.h"
+#include "modhead.h"
+
+#include <stdio.h>
+
+/**
+ * We only support a single device in this dummy driver.
+ * If you support multiple devices, this could be an array, to find
+ * the devices you support. Each of the places where the 'mydevice'
+ * structure is referenced would need to be a loop over all the
+ * devices you can support.
+ */
+
+static device_t mydevice;
+
+
+/*******************************************************************
+ Function:      devices_register
+ Description:   Register the devices we supply with the BlockDevices module
+ Parameters:    pw = our private word
+ Returns:       none
+ ******************************************************************/
+void devices_register(void *pw)
+{
+    device_t *device = &mydevice;
+
+    /* Open the device, connecting to it and getting other information necessary */
+    device->device_id = DeviceId_Invalid;
+    device_open(device);
+    /* The open will fill in the parameters that should be used for the
+     * registration.
+     */
+    {
+
+        _kernel_oserror *err = _swix(BlockDevice_Register,
+                                     _INR(1, 3)|_OUT(0),
+                                     &mydevice.info,
+                                     Driver_Entry, pw,
+                                     &device->device_id);
+        if (err)
+        {
+            printf("Register failed: %s (&%x)\n", err->errmess, err->errnum);
+            /* Could not register, so we give up - maybe the BlockDevices isn't present */
+            device->device_id = DeviceId_Invalid;
+            /* Close the device to release resources, etc */
+            device_close(device);
+        }
+    }
+}
+
+/*******************************************************************
+ Function:      devices_deregister
+ Description:   Deregister the devices we supply with the BlockDevices module
+                and shut them down
+ Parameters:    pw = our private word
+                call_deregister = 1 if we should actually deregister the
+                                    devices
+                                  0 if we should just shut them down
+                                    (because the module is already dead)
+ Returns:       none
+ ******************************************************************/
+void devices_deregister(void *pw, int call_deregister)
+{
+    device_t *device = &mydevice;
+    /* First, deregister the devices if necessary */
+    if (call_deregister)
+    {
+        if (device->device_id != DeviceId_Invalid)
+        {
+            _swix(BlockDevice_Deregister, _IN(0), device->device_id);
+            device->device_id = DeviceId_Invalid;
+        }
+    }
+    device_close(device);
+}
+
+/*******************************************************************
+ Function:      devices_finddevice
+ Description:   Given the device_id, return the device structure
+ Parameters:    device_id = device_id to look for
+ Returns:       device structure, or NULL if not valid
+ ******************************************************************/
+device_t *devices_finddevice(int device_id)
+{
+    device_t *device = &mydevice;
+
+    if (device->device_id == device_id)
+        return device;
+
+    return NULL;
+}
