@@ -251,6 +251,9 @@ _kernel_oserror *SWI_Register(int number, _kernel_swi_regs *r, void *pw)
 
     if (!running) return err_Starting;
 
+    if (info->device_flags & DeviceFlag_Valid)
+        return err_RegisterFailedFlags; /* They gave unsupported flags */
+
     dev = device_create(
         info, driver_code, driver_ws);
 

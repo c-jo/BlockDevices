@@ -1,7 +1,8 @@
 Device information block
 
 +0  device_flags:
-        None defined
+        b0:     Device is read only
+        b1-31:  Must be 0
 +4  Interface and media type
         b0-15:  Interface type
                     0 = Unknown
@@ -77,6 +78,9 @@ SWI BlockDevices_Write
 
 Writes data to the block device.
 
+Errors:
+    ReadOnly: Reported when the device is not writeable.
+
 
 SWI BlockDevices_Register
 
@@ -90,6 +94,7 @@ Register a block device driver.
 
 Errors:
     RegisterFailed: Reported when the device is not recognised.
+    RegisterFailedFlags: Reported when the flags supplied are not recognised.
 
 
 SWI BlockDevices_Deregister
