@@ -31,11 +31,31 @@ Device information block
 +20 partition type (using the partition scheme):
 +24 number of blocks on device (64 bit)
 +32 size of blocks
-+36 pointer to 0-terminated string describing manufacturer
-+40 pointer to 0-terminated string describing product
-+44 pointer to 0-terminated string describing serial number
-+48 pointer to 0-terminated string describing firmware version
++36 pointer to 0-terminated string describing device name
++40 pointer to 0-terminated string describing manufacturer
++44 pointer to 0-terminated string describing product
++48 pointer to 0-terminated string describing serial number
++52 pointer to 0-terminated string describing firmware version
 
+
+Device names
+
+Device names are a `/` separated list of components which make up
+the device, in a simple tree structure. The device paths always
+start with a `/` character once registered. Identifiers within the
+device path are usually lower case, but are not case sensitive.
+They should, generally, be given as simple ASCII strings. Indexes
+given within the device name should be 0-indexed unless an existing
+naming scheme requires a different form. A separator character
+should be used for each logical component of the path.
+
+For example, a device path might take the form:
+
+/scsi/1/2/3     - The SCSI device on bus 1, device 2, LUN 3.
+/nvme/0/1       - The second disk attached to the first NVMe
+                  device.
+/nvme/0/1/gpt/0 - The first partition on the above device,
+                  using the GUID Partition Type format.
 
 
 SWI API
@@ -87,6 +107,17 @@ SWI BlockDevices_Register
 <=  R0 = device id for registered device
 
 Register a block device driver.
+
+On registration the device name may be given one of 4 ways:
+
+* 0 or an empty string, to use a simple incrementing value.
+  This should only be used for prototype devices.
+* A fully specified path, starting with a `/` character.
+* A device name, with parent device supplied. In this form,
+  the device name will be appended to the path of the parent
+  device.
+* A device name, without a parent device supplied. In this
+  form, the device name will have a `/` character prepended.
 
 Errors:
     RegisterFailed: Reported when the device is not recognised.

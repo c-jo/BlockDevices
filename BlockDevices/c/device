@@ -12,9 +12,14 @@
 
 /* #include "BlockDevices.h" */
 #include "device.h"
+#include "devices.h"
 #include "str.h"
 
 #include <stdio.h>
+
+/* A counter to use for unnamed devices */
+static int unnamed_counter = 1;
+
 
 /*******************************************************************
  Function:      device_create
@@ -48,10 +53,71 @@ device_t *device_create(
     device->info.block_count         = info->block_count;
     device->info.block_size          = info->block_size;
 
-    device->info.manufacturer        = info->manufacturer ? strdup(info->manufacturer) : NULL;
-    device->info.product             = info->product ? strdup(info->product) : NULL;
-    device->info.serial              = info->serial ? strdup(info->serial) : NULL;
-    device->info.firmware            = info->firmware ? strdup(info->firmware) : NULL;
+    /* Allocations for the name are slightly harder.
+     * The name on registration can be just a simple string, or it might be a device path.
+     * If it's a simple string, we need to construct a path based on the parents.
+     */
+    {
+        const char *name = info->name;
+        if (name == NULL || name[0] == '\0')
+        {
+            /* No name was given. Let's use an incrementing value. */
+            char newname[16];
+            sprintf(newname, "device/%i", unnamed_counter++);
+            device->info.name = strdup(newname);
+            if (device->info.name == NULL)
+                goto failed;
+        }
+        else if (name[0] == '/')
+        {
+            /* They gave a full device path, so just copy it */
+            device->info.name = strdup(info->name);
+            if (device->info.name == NULL)
+                goto failed;
+        }
+        else if (device->info.parent_device)
+        {
+            int ssize;
+            /* If there's a parent device, we construct a new name based on it */
+            device_t *parentdevice = devices_find(device->info.parent_device);
+            if (parentdevice == NULL)
+                goto failed;
+            ssize = strlen(parentdevice->info.name) + 1 + strlen(info->name) + 1;
+            device->info.name = calloc(1, ssize);
+            if (device->info.name == NULL)
+                goto failed;
+            sprintf(device->info.name, "%s/%s", parentdevice->info.name, info->name);
+        }
+        else
+        {
+            /* They gave a name without a leading '/', so prepend one */
+            device->info.name = calloc(1, strlen(info->name));
+            if (device->info.name == NULL)
+                goto failed;
+            device->info.name[0] = '/';
+            strcpy(device->info.name + 1, info->name);
+        }
+    }
+
+    /* The other strings are easier to copy */
+#define STRDUP_OR_FAIL(_to, _from) \
+    do { \
+        if (_from) \
+        { \
+            _to = strdup(_from); \
+            if (_to == NULL) \
+                goto failed; \
+        } \
+        else \
+        { \
+            _to = NULL; \
+        } \
+    } while (0)
+
+    STRDUP_OR_FAIL(device->info.manufacturer, info->manufacturer);
+    STRDUP_OR_FAIL(device->info.product, info->product);
+    STRDUP_OR_FAIL(device->info.serial, info->serial);
+    STRDUP_OR_FAIL(device->info.firmware, info->firmware);
 
     device->driver_code = driver_code;
     device->driver_ws = driver_ws;
@@ -61,6 +127,7 @@ device_t *device_create(
 failed:
     if (device)
     {
+        free(device->info.name);
         free(device->info.manufacturer);
         free(device->info.product);
         free(device->info.serial);
@@ -81,6 +148,8 @@ void device_destroy(device_t *device)
 {
     if (device)
     {
+        free(device->info.name);
+        device->info.manufacturer = NULL;
         free(device->info.manufacturer);
         device->info.manufacturer = NULL;
         free(device->info.product);

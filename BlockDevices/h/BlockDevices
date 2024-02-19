@@ -31,6 +31,7 @@ typedef struct device_info_s {
     unsigned  partition_type;
     UINT64    block_count;
     unsigned  block_size;
+    char *    name;
     char *    manufacturer;
     char *    product;
     char *    serial;
