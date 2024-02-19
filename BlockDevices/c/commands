@@ -68,8 +68,9 @@ _kernel_oserror *Cmd_BlockDevices(void)
 
     for (device = 0; (device=devices_after(device)) != NULL; )
     {
-        printf("%5i : %-8s  %-24s  %-32s  %-9s  %s\n",
+        printf("%5i : %s\n%5s   %-24s  %-32s  %-9s  %s\n",
                (int)device->device_id,
+               device->info.name,
                "",
                device->info.manufacturer ? device->info.manufacturer : "",
                device->info.product      ? device->info.product      : "",
