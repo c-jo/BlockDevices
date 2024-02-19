@@ -20,7 +20,7 @@ typedef struct idmessages_s {
 } idmessages_t;
 #define IDMESSAGE_LAST (-1)
 
-/*
+
 static idmessages_t interface_names[] = {
     { BlockDevice_Interface_Unknown, "-" },
     { BlockDevice_Interface_FDC, "FDC" },
@@ -32,7 +32,16 @@ static idmessages_t interface_names[] = {
     { BlockDevice_Interface_NVMe, "NVMe" },
     { IDMESSAGE_LAST }
 };
-*/
+
+static idmessages_t media_names[] = {
+    { BlockDevice_Media_Unknown, "-" },
+    { BlockDevice_Media_FloppyDisc, "FloppyDisc" },
+    { BlockDevice_Media_HardDisc, "HardDisc" },
+    { BlockDevice_Media_Optical, "Optical" },
+    { BlockDevice_Media_SSD, "SSD" },
+    { IDMESSAGE_LAST }
+};
+
 
 /*******************************************************************
  Function:      lookup_description
@@ -68,9 +77,21 @@ _kernel_oserror *Cmd_BlockDevices(void)
 
     for (device = 0; (device=devices_after(device)) != NULL; )
     {
-        printf("%5i : %s\n%5s   %-24s  %-32s  %-9s  %s\n",
+        char iftype[12];
+        char mediatype[12];
+        printf("%5i : %s\n",
                (int)device->device_id,
-               device->info.name,
+               device->info.name);
+
+        sprintf(iftype, "IF#%i", device->info.interface_type);
+        sprintf(mediatype, "Media#%i", device->info.media_type);
+        printf("%5s   %-8s  %-16s\n",
+               "",
+               lookup_description(device->info.interface_type, interface_names, iftype),
+               lookup_description(device->info.media_type, media_names, mediatype)
+               );
+
+        printf("%5s   %-24s  %-32s  %-9s  %s\n",
                "",
                device->info.manufacturer ? device->info.manufacturer : "",
                device->info.product      ? device->info.product      : "",
