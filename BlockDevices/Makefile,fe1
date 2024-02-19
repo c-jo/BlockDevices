@@ -2,6 +2,8 @@
 # Makefile for BlockDevices
 #
 
+BUILD32 = 1
+
 #
 # Program specific options:
 #
@@ -56,6 +58,7 @@ include CModule
 # Additional dependencies
 $(OZDIR).module: h.modhead
 $(OZDIR).commands: h.modhead
+$(OZDIR).device: h.modhead
 
 # Export rules
 # For any files you export with EXPORTS you may need to include an

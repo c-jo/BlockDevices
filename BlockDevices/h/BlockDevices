@@ -20,6 +20,10 @@
 // Invalid device id
 #define DeviceId_Invalid (0)
 
+/* Flags understood in the device information block */
+#define DeviceFlag_ReadOnly (1<<0)      /* Device cannot be written to */
+#define DeviceFlag_Valid    (1<<0)      /* Mask of the valid device flags */
+
 // Block device info block
 typedef struct device_info_s {
     unsigned  device_flags;
