@@ -19,6 +19,7 @@ void device_open(device_t *device)
     printf("device_open\n");
     device->info.block_count.lo = 1000000;
     device->info.block_size = 512;
+    device->info.name = "dummy/0";
     device->info.manufacturer = "Dummy Devices Ltd";
     device->info.product = "Dummy Device One";
     device->info.serial = "01234567";
