@@ -37,8 +37,21 @@ device_t *device_create(
     if (device == NULL)
         goto failed;
 
-    memcpy(&device->info, info, sizeof(device->info));
-    // TODO: strdup the srings
+    /* Copy the fields to our device information block */
+    device->info.device_flags        = info->device_flags;
+    device->info.interface_type      = info->interface_type;
+    device->info.media_type          = info->media_type;
+    device->info.parent_device       = info->parent_device;
+    device->info.partition_scheme    = info->partition_scheme;
+    device->info.partition_index     = info->partition_index;
+    device->info.partition_type      = info->partition_type;
+    device->info.block_count         = info->block_count;
+    device->info.block_size          = info->block_size;
+
+    device->info.manufacturer        = info->manufacturer ? strdup(info->manufacturer) : NULL;
+    device->info.product             = info->product ? strdup(info->product) : NULL;
+    device->info.serial              = info->serial ? strdup(info->serial) : NULL;
+    device->info.firmware            = info->firmware ? strdup(info->firmware) : NULL;
 
     device->driver_code = driver_code;
     device->driver_ws = driver_ws;
@@ -48,6 +61,10 @@ device_t *device_create(
 failed:
     if (device)
     {
+        free(device->info.manufacturer);
+        free(device->info.product);
+        free(device->info.serial);
+        free(device->info.firmware);
         free(device);
     }
     return NULL;
@@ -62,7 +79,18 @@ failed:
  ******************************************************************/
 void device_destroy(device_t *device)
 {
-    free(device);
+    if (device)
+    {
+        free(device->info.manufacturer);
+        device->info.manufacturer = NULL;
+        free(device->info.product);
+        device->info.product = NULL;
+        free(device->info.serial);
+        device->info.serial = NULL;
+        free(device->info.firmware);
+        device->info.firmware = NULL;
+        free(device);
+    }
 }
 
 

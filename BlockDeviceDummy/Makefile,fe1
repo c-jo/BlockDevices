@@ -2,6 +2,9 @@
 # Makefile for BlockDeviceDummy
 #
 
+# Always build 32bit
+BUILD32 = 1
+
 #
 # Program specific options:
 #

@@ -56,6 +56,15 @@ jobs:
       - "echo *** BlockDeviceDummy: Load BlockDeviceDummy"
       - rmload BlockDeviceDummy.rm32.BlockDeviceDummy
 
+      # Simple tests
+      - "echo *** Test BlockDevices command"
+      - BlockDevices
+      - "echo *** Test killing the block device driver module"
+      - RMKill BlockDeviceDummy
+      - "echo *** Shouldn't crash when listing devices after killing"
+      - BlockDevices
+      - rmload BlockDeviceDummy.rm32.BlockDeviceDummy
+
       - "echo *** Copy artifacts"
       - cdir Artifacts
       #- cdir Artifacts.prminxml
