@@ -81,6 +81,52 @@ typedef struct transfer_block_s {
   unsigned    count;
 } transfer_block_t;
 
+// Constants for the BlockDevice operations
+#define BlockDeviceOp_Read          (1)
+#define BlockDeviceOp_Write         (2)
+
+/* Various operations on the BlockDevice at different levels */
+#define BlockDeviceOp_MiscOp        (3)
+/* MiscOps take the form of bit field defining the type of operations:
+    b28-31:     domain:
+                    0   Device - operations that address the device itself
+                    1   Media - operations that address the media storing data
+                    2   Security - operations that control the security of data
+                    3   Sector - operations that affect sector data
+    b27         status/health request
+    b25-26      data type in R1/R2:
+                    0   opaque
+                    1   read string data in R1, length in R2
+                    2   64bit value (low in R1, high in R2)
+                    3   read data in R1, length in R2
+    b0-23:      dependant on the domain
+
+  For sector operations:
+    b24-25:     type of sector reference:
+                    0   R1 contains a reference to a block
+                    1   R1 contains a reference to a block and block count
+                    2   R1 contains a reference to a list of blocks
+                    3   R1 contains a reference to a list of blocks and counts
+ */
+#define BlockDeviceMiscOp_Device      (0<<28)
+#define BlockDeviceMiscOp_Media       (1<<28)
+#define BlockDeviceMiscOp_Sector      (2<<28)
+#define BlockDeviceMiscOp_Security    (3<<28)
+#define BlockDeviceMiscOpFlag_Status  (1<<27)
+#define BlockDeviceMiscOpFlag_DataOpaque  (0<<25)
+#define BlockDeviceMiscOpFlag_DataString  (1<<25)
+#define BlockDeviceMiscOpFlag_Data64Bit   (2<<25)
+#define BlockDeviceMiscOpFlag_DataData    (3<<25)
+
+/* Reserved device operations (not currently defined but set aside for now) */
+#define BlockDeviceMiscOp_Device_PowerEject  (BlockDeviceMiscOp_Device | 0) /* Eject the media, removing block device */
+#define BlockDeviceMiscOp_Device_Identify    (BlockDeviceMiscOp_Device | 1) /* Flash a light or something */
+#define BlockDeviceMiscOp_Media_ReadCapacity (BlockDeviceMiscOp_Media | 0) /* Read the size of the media */
+#define BlockDeviceMiscOp_Media_Manufacturer (BlockDeviceMiscOp_Media | BlockDeviceMiscOpFlag_DataString | 0)
+#define BlockDeviceMiscOp_Media_Model        (BlockDeviceMiscOp_Media | BlockDeviceMiscOpFlag_DataString | 1)
+#define BlockDeviceMiscOp_Media_SMART        (BlockDeviceMiscOp_Media | BlockDeviceMiscOpFlag_DataData | 0)
+#define BlockDeviceMiscOp_Sector_Trim        (BlockDeviceMiscOp_Sector | 0)
+
 #endif
 
 // Service calls
