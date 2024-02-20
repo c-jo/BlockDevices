@@ -177,7 +177,7 @@ _kernel_oserror * device_read(device_t *device, unsigned long flags, transfer_bl
 {
     return _callx(device->driver_code, device->driver_ws,
                  _INR(0, 3),
-                 1, device->device_id, flags, block);
+                 BlockDeviceOp_Read, device->device_id, flags, block);
 }
 
 
@@ -197,5 +197,5 @@ _kernel_oserror * device_write(device_t *device, unsigned long flags, transfer_b
 
     return _callx(device->driver_code, device->driver_ws,
                  _INR(0, 3),
-                 2, device->device_id, flags, block);
+                 BlockDeviceOp_Write, device->device_id, flags, block);
 }
