@@ -234,3 +234,19 @@ _kernel_oserror * device_write(device_t *device, unsigned long flags, transfer_b
                  _INR(0, 3),
                  BlockDeviceOp_Write, device->device_id, flags, block);
 }
+
+/*******************************************************************
+ Function:      device_miscop
+ Description:   Perform miscellaneous operations on the device
+ Parameters:    device -> the device to write to
+                op = operation to perform
+                r-> registers for operation
+ Returns:       pointer to an error block if failed
+                NULL if successful
+ ******************************************************************/
+_kernel_oserror * device_miscop(device_t *device, unsigned long op, _kernel_swi_regs *r)
+{
+    return _callx(device->driver_code, device->driver_ws,
+                 _INR(0, 3),
+                 BlockDeviceOp_MiscOp, device->device_id, op, r);
+}
