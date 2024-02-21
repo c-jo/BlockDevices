@@ -49,7 +49,8 @@ error-identifiers: \
  err_RegisterFailed("Device registration failed") \
  err_RegisterFailedFlags("Device registration failed (flags not supported)") \
  err_ReadOnly("Device cannot be written to (device is read only)") \
- err_TransferOutsideDevice("Block transfer is beyond device end")
+ err_TransferOutsideDevice("Block transfer is beyond device end") \
+ err_BadMiscOp("BlockDevice does not support MiscOp operation")
 
 ; When the module is initialised, this routine will be entered. You should
 ; be very careful to initialise your module safely. If anything fails, you
