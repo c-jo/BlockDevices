@@ -79,7 +79,7 @@ swi-decoding-table: BlockDevice \
  Enumerate/SWI_Enumerate \
  Read/SWI_Read \
  Write/SWI_Write \
- 3 \
+ MiscOp/SWI_MiscOp \
  4 \
  5 \
  6 \
