@@ -66,17 +66,13 @@ void Mod_Service(int service, _kernel_swi_regs *r, void *pw)
 {
     switch (service)
     {
-        case Service_BlockDevices:
-            printf("BlockDeviceDummy: Service_BlockDevices %d\n", r->r[0]);
-            switch (r->r[0]) {
-                case Service_BlockDevices_Started:
-                  devices_register(pw);
-                  break;
+    case Service_BlockDevices_Started:
+        devices_register(pw);
+        break;
 
-                case Service_BlockDevices_Dying:
-                  devices_deregister(pw, 0);
-                  break;
-        }
+    case Service_BlockDevices_Dying:
+        devices_deregister(pw, 0);
+        break;
     }
 }
 

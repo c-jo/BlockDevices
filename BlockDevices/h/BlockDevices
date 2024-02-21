@@ -79,21 +79,21 @@ typedef struct transfer_block_s {
 
 #endif
 
-// Service calls - **NOT UET REGISTERED**
-#define Service_BlockDevices (0x88000)
-#define Service_BlockDevices_Started (0)
-#define Service_BlockDevices_Dying (1)
-#define Service_BlockDevices_DeviceAdded (2)
-#define Service_BlockDevices_DeviceRemoved (3)
+// Service calls
+#define ServiceBase_BlockDevices (0x81200)
+#define Service_BlockDevices_Started (ServiceBase_BlockDevices + 0)
+#define Service_BlockDevices_Dying (ServiceBase_BlockDevices + 1)
+#define Service_BlockDevices_DeviceAdded (ServiceBase_BlockDevices + 2)
+#define Service_BlockDevices_DeviceRemoved (ServiceBase_BlockDevices + 3)
 
-// Error numbers - **NOT YET REGISTERED**
-#define ErrorBase_BlockDevice (0x880000)
-#define ErrorNumber_NoSuchDevice (ErrorBase_BlockDevice + 0)
-#define ErrorNumber_DeviceInUse (ErrorBase_BlockDevice + 1)
+// Error numbers
+#define ErrorBase_BlockDevices (0x822300)
+#define ErrorNumber_NoSuchDevice (ErrorBase_BlockDevices + 0)
+#define ErrorNumber_DeviceInUse (ErrorBase_BlockDevices + 1)
 
-// SWI numbers - **NOT YET REGISTERED*
+// SWI numbers
 #ifndef BlockDevice_Enumerate
-#define BlockDevice_0 (0x5F000)
+#define BlockDevice_0 (0x5A6C0)
 #define BlockDevice_Enumerate (BlockDevice_0 + 0)
 #define BlockDevice_Read (BlockDevice_0 + 1)
 #define BlockDevice_Write (BlockDevice_0 + 2)

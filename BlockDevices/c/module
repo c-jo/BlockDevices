@@ -27,15 +27,11 @@ static void announce(int started)
 {
     if (started)
     {
-        _swix(OS_ServiceCall, _INR(0, 1),
-                              Service_BlockDevices_Started,
-                              Service_BlockDevices);
+        _swix(OS_ServiceCall, _IN(0), Service_BlockDevices_Started);
     }
     else
     {
-        _swix(OS_ServiceCall, _INR(0, 1),
-                              Service_BlockDevices_Dying,
-                              Service_BlockDevices);
+        _swix(OS_ServiceCall, _IN(0), Service_BlockDevices_Dying);
     }
 }
 
