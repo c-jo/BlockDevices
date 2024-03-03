@@ -12,7 +12,7 @@
 // longlong.h defines USE_LONG_LONG itself
 #undef USE_LONG_LONG
 #include "longlong.h"
-#define UINT64 longlong_t
+#define UINT64 ulonglong_t
 #else
 #define UINT64 uint64_t
 #endif
@@ -24,22 +24,25 @@
 #define DeviceFlag_ReadOnly (1<<0)      /* Device cannot be written to */
 #define DeviceFlag_Valid    (1<<0)      /* Mask of the valid device flags */
 
+// The address of a block on a device
+typedef UINT64 blockaddr_t;
+
 // Block device info block
 typedef struct device_info_s {
-    unsigned  device_flags;
-    unsigned  interface_type:16;
-    unsigned  media_type:16;
-    unsigned  parent_device;
-    unsigned  partition_scheme:8;
-    unsigned  partition_index:24;
-    unsigned  partition_type;
-    UINT64    block_count;
-    unsigned  block_size;
-    char *    name;
-    char *    manufacturer;
-    char *    product;
-    char *    serial;
-    char *    firmware;
+    unsigned    device_flags;
+    unsigned    interface_type:16;
+    unsigned    media_type:16;
+    unsigned    parent_device;
+    unsigned    partition_scheme:8;
+    unsigned    partition_index:24;
+    unsigned    partition_type;
+    blockaddr_t block_count;
+    unsigned    block_size;
+    char *      name;
+    char *      manufacturer;
+    char *      product;
+    char *      serial;
+    char *      firmware;
 } device_info_t;
 
 // Interface types
@@ -72,9 +75,9 @@ typedef enum partition_scheme_e {
 
 // Used to control read / writes
 typedef struct transfer_block_s {
-  UINT64   lba;
-  void *   address;
-  unsigned count;
+  blockaddr_t lba;
+  void *      address;
+  unsigned    count;
 } transfer_block_t;
 
 #endif
