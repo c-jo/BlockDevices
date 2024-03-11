@@ -138,6 +138,31 @@ failed:
     return NULL;
 }
 
+/*************************************************** Gerph *********
+ Function:      device_check_transfer
+ Description:   Check whether a transfer would be valid
+ Parameters:    device-> the device we're operating on
+                transfer = the transfer address
+ Returns:       pointer to error to return, or NULL if operation is acceptable
+ ******************************************************************/
+_kernel_oserror *device_check_transfer(device_t *device, transfer_block_t *transfer)
+{
+    blockaddr_t transfer_end;
+    int blocks_count;
+    blockaddr_t blocks_count_ll;
+
+    blocks_count = (transfer->count + device->info.block_size - 1) / device->info.block_size;
+
+    LL_UI2L(blocks_count_ll, blocks_count);
+    LL_ADD(transfer_end, transfer->lba, blocks_count_ll);
+    if (LL_UCMP(transfer_end, >, device->info.block_count))
+    {
+        return err_TransferOutsideDevice;
+    }
+
+    return NULL;
+}
+
 /*******************************************************************
  Function:      device_destroy
  Description:   Destroy the device
@@ -175,6 +200,11 @@ void device_destroy(device_t *device)
  ******************************************************************/
 _kernel_oserror * device_read(device_t *device, unsigned long flags, transfer_block_t *block)
 {
+    _kernel_oserror *err;
+    err = device_check_transfer(device, block);
+    if (err)
+        return err;
+
     return _callx(device->driver_code, device->driver_ws,
                  _INR(0, 3),
                  1, device->device_id, flags, block);
@@ -192,8 +222,13 @@ _kernel_oserror * device_read(device_t *device, unsigned long flags, transfer_bl
  ******************************************************************/
 _kernel_oserror * device_write(device_t *device, unsigned long flags, transfer_block_t *block)
 {
+    _kernel_oserror *err;
     if (device->info.device_flags & DeviceFlag_ReadOnly)
         return err_ReadOnly;
+
+    err = device_check_transfer(device, block);
+    if (err)
+        return err;
 
     return _callx(device->driver_code, device->driver_ws,
                  _INR(0, 3),
