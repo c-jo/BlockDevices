@@ -161,7 +161,7 @@ BlockDevices(max-args: 0,
 help-text: "Displays information about the block devices known to the system.",
 invalid-syntax: "Syntax: *BlockDevices",
 add-syntax:),
-BblockDeviceInfo(min-args:1, max-args: 1,
+BlockDeviceInfo(min-args:1, max-args: 1,
 help-text: "Displays information about a block device.",
 invalid-syntax: "Syntax: *BlockDeviceInfo <Device>",
 add-syntax:)
