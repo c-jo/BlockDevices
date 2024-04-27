@@ -14,6 +14,7 @@
 #include "longlong.h"
 #define UINT64 longlong_t
 #else
+#include <stdint.h>
 #define UINT64 uint64_t
 #endif
 
@@ -80,23 +81,24 @@ typedef struct transfer_block_s {
 #endif
 
 // Service calls
-#define ServiceBase_BlockDevices (0x81200)
+#define ServiceBase_BlockDevices 0x81200
 #define Service_BlockDevices_Started (ServiceBase_BlockDevices + 0)
 #define Service_BlockDevices_Dying (ServiceBase_BlockDevices + 1)
 #define Service_BlockDevices_DeviceAdded (ServiceBase_BlockDevices + 2)
 #define Service_BlockDevices_DeviceRemoved (ServiceBase_BlockDevices + 3)
 
 // Error numbers
-#define ErrorBase_BlockDevices (0x822300)
+#define ErrorBase_BlockDevices 0x822300
 #define ErrorNumber_NoSuchDevice (ErrorBase_BlockDevices + 0)
 #define ErrorNumber_DeviceInUse (ErrorBase_BlockDevices + 1)
 
 // SWI numbers
 #ifndef BlockDevice_Enumerate
-#define BlockDevice_0 (0x5A6C0)
+#define BlockDevice_0 0x5A6C0
 #define BlockDevice_Enumerate (BlockDevice_0 + 0)
-#define BlockDevice_Read (BlockDevice_0 + 1)
-#define BlockDevice_Write (BlockDevice_0 + 2)
+#define BlockDevice_Info (BlockDevice_0 + 1)
+#define BlockDevice_Read (BlockDevice_0 + 2)
+#define BlockDevice_Write (BlockDevice_0 + 3)
 #define BlockDevice_Register (BlockDevice_0 + 16)
 #define BlockDevice_Deregister (BlockDevice_0 + 17)
 

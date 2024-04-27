@@ -77,9 +77,9 @@ finalisation-code: Mod_Final
 ; may be followed by /<entry> to use a particular routine to handle a SWI.
 swi-decoding-table: BlockDevice \
  Enumerate/SWI_Enumerate \
+ Info/SWI_Info \
  Read/SWI_Read \
  Write/SWI_Write \
- 3 \
  4 \
  5 \
  6 \
