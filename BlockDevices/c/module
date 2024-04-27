@@ -27,15 +27,11 @@ static void announce(int started)
 {
     if (started)
     {
-        _swix(OS_ServiceCall, _INR(0, 1),
-                              Service_BlockDevices_Started,
-                              Service_BlockDevices);
+        _swix(OS_ServiceCall, _IN(0), Service_BlockDevices_Started);
     }
     else
     {
-        _swix(OS_ServiceCall, _INR(0, 1),
-                              Service_BlockDevices_Dying,
-                              Service_BlockDevices);
+        _swix(OS_ServiceCall, _IN(0), Service_BlockDevices_Dying);
     }
 }
 
@@ -179,6 +175,27 @@ _kernel_oserror *SWI_Enumerate(int number, _kernel_swi_regs *r, void *pw)
         r->r[0] = (int)device->device_id;
         r->r[1] = (int)&device->info;
     }
+    return NULL;
+}
+
+/*******************************************************************
+ Function:      SWI_Info
+ Description:   Return info about a device that we have registered
+ Parameters:    number = SWI number
+                r -> registers block on entry for update
+                    =>  R0  = device id
+                    <=  R1 -> device info
+                pw -> module private word
+ Returns:       pointer to an error block if failed
+                NULL if successful
+ ******************************************************************/
+_kernel_oserror *SWI_Info(int number, _kernel_swi_regs *r, void *pw)
+{
+    device_t *device = devices_find(r->r[0]);
+    if (device == NULL)
+        return err_BadDevice;
+
+    r->r[1] = (int)&device->info;
     return NULL;
 }
 

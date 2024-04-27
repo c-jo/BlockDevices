@@ -29,11 +29,10 @@ static struct {
  ******************************************************************/
 static void device_notify_announce(device_t *device, int started)
 {
-    _swix(OS_ServiceCall, _INR(0, 2),
+    _swix(OS_ServiceCall, _INR(0,1),
+                          device->device_id,
                           started ? Service_BlockDevices_DeviceAdded
-                                  : Service_BlockDevices_DeviceRemoved,
-                          Service_BlockDevices,
-                          device->device_id);
+                                  : Service_BlockDevices_DeviceRemoved);
 }
 
 /*******************************************************************

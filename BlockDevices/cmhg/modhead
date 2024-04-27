@@ -35,7 +35,7 @@ swi-chunk-base-number: BlockDevice_0
 ; &1B000000- &1BFFFFFF are for program (NOT module) errors.
 ; &80000000- &FFFFFFFF are for serious hardware exceptions.
 ; Consult PRM 1-43, 5a-493 for more details.
-error-base: ErrorBase_BlockDevice
+error-base: ErrorBase_BlockDevices
 
 ; Allocating error messages within the module is more efficient than doing
 ; so manually in your C code, and is less likely to pollute error number
@@ -78,9 +78,9 @@ finalisation-code: Mod_Final
 ; may be followed by /<entry> to use a particular routine to handle a SWI.
 swi-decoding-table: BlockDevice \
  Enumerate/SWI_Enumerate \
+ Info/SWI_Info \
  Read/SWI_Read \
  Write/SWI_Write \
- 3 \
  4 \
  5 \
  6 \
@@ -157,13 +157,12 @@ generic-veneers: StartupCallback_Entry/StartupCallback_Handler
 ; no-handler:
 ; The command has no handler function present. This is useful for
 ; creating help-only commands.
-; Commands Fans and FanSpeed are registered.
 command-keyword-table: Mod_Command
 BlockDevices(max-args: 0,
 help-text: "Displays information about the block devices known to the system.",
 invalid-syntax: "Syntax: *BlockDevices",
 add-syntax:),
-BblockDeviceInfo(min-args:1, max-args: 1,
+BlockDeviceInfo(min-args:1, max-args: 1,
 help-text: "Displays information about a block device.",
 invalid-syntax: "Syntax: *BlockDeviceInfo <Device>",
 add-syntax:)
@@ -171,4 +170,8 @@ add-syntax:)
 ; The module service entry will be called to process services. You are
 ; strongly recommended to include the numbers of the services you wish to
 ; handle.
-service-call-handler: Mod_Service Service_BlockDevices
+service-call-handler: Mod_Service \
+ Service_BlockDevices_Started \
+ Service_BlockDevices_Dying \
+ Service_BlockDevices_DeviceAdded \
+ Service_BlockDevices_DeviceRemoved
