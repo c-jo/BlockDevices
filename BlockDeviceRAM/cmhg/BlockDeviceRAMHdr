@@ -1,0 +1,20 @@
+; CMHG File for BlockDeviceTest
+
+#include "VersionNum"
+#include "BlockDevices.h"
+
+title-string: BlockDeviceRAM
+
+help-string: BlockDeviceRAM Module_MajorVersion_CMHG Module_MinorVersion_CMHG
+
+date-string: Module_Date_CMHG
+
+initialisation-code: module_initialise
+
+finalisation-code: module_finalise
+
+generic-veneers: Driver_Entry/Driver_Handler
+
+service-call-handler: module_service \
+    Service_BlockDevices_Started, \
+    Service_BlockDevices_Dying

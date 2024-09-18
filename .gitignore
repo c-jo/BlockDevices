@@ -11,3 +11,4 @@
 **/rm32/*
 BlockDevices/h/modhead
 BlockDeviceDummy/h/modhead
+BlockDeviceRAM/h/BlockDeviceRAMHdr

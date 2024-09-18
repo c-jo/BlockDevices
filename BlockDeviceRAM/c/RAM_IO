@@ -1,0 +1,45 @@
+#include "RAM_IO.h"
+#include "swis.h"
+
+#include <stdio.h>
+#include <string.h>
+#include <stdbool.h>
+#include <stdlib.h>
+
+#include "DebugLib/DebugLib.h"
+
+#define UNUSED(x) {(void)x;}
+
+_kernel_oserror *ram_io(unsigned op,
+                        ram_device_t *device,
+                        unsigned flags,
+                        transfer_block_t *block)
+{
+  UNUSED(flags);
+
+  //_kernel_oserror *e = 0;
+
+  while (block->count > 0)
+  {
+    unsigned this = block->count< 8 ? block->count : 8;
+    unsigned offset = (unsigned)block->lba * device->info.block_size;
+
+    void *ram = (char*)device->area_base + offset;
+    size_t size = this * device->info.block_size;
+
+    dprintf(("", "ram_op %d,lba:%lld, address:%p, count:%d. this:%d, offset:%d\n",
+           op, block->lba, block->address, block->count, this, offset));
+
+    if (op == 1)
+      memcpy(block->address, ram, size);
+
+    if (op == 2)
+      memcpy(ram, block->address, size);
+
+    block->lba += this;
+    block->address = (char*)block->address + this * device->info.block_size;
+    block->count -= this;
+  }
+
+  return 0;
+}

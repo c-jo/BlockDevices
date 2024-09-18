@@ -1,0 +1,53 @@
+/*******************************************************************
+ * File:        devices
+ * Purpose:     Device registration and management
+ * Author:      Gerph
+ ******************************************************************/
+
+#include <stdio.h>
+#include "swis.h"
+
+#include "RAMDevice.h"
+
+/*************************************************** Gerph *********
+ Function:      devices_register
+ Description:   Register the devices we supply with the BlockDevices module
+ Parameters:    pw = our private word
+ Returns:       none
+ ******************************************************************/
+void device_open(ram_device_t *device)
+{
+/*
+  device->state = CREATED;
+    _kernel_oserror *e = 0;
+    uint32_t flags;
+    uint32_t area_size;
+
+    e = _swix(PCI_HardwareAddress, _INR(0,1)|_IN(3)|_OUTR(0,2)|_OUT(4),
+              0, 0, device->pci_handle,
+              &flags, &device->pci_address, &area_size,
+              &device->logical_address);
+    if (e) {
+      printf("Error: %s (%x)\n", e->errmess, e->errnum);
+      return;
+    }
+
+    nvme_queue_init(&device->admin_queue, 0, ADMIN_QUEUE_SIZE,
+        device->logical_address+0x400,
+        device->logical_address+0x401);
+
+    nvme_queue_init(&device->io_queue, 1, IO_QUEUE_SIZE,
+        device->logical_address+0x402,
+        device->logical_address+0x403);
+*/
+}
+
+/*************************************************** Gerph *********
+ Function:      devices_register
+ Description:   Register the devices we supply with the BlockDevices module
+ Parameters:    pw = our private word
+ Returns:       none
+ ******************************************************************/
+void device_close(ram_device_t *device)
+{
+}

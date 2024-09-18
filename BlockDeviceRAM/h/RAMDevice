@@ -1,0 +1,57 @@
+/*******************************************************************
+ * File:        device
+ * Purpose:     device interfacing
+ * Author:      Gerph
+ ******************************************************************/
+
+#ifndef RAM_DEVICE_H
+#define RAM_DEVICE_H
+
+#include "BlockDevices.h"
+
+/* Information about the device */
+typedef struct ran_device_s {
+  int device_id;
+  int dynamic_area;
+  void *area_base;
+  device_info_t info;
+} ram_device_t;
+
+/*************************************************** Gerph *********
+ Function:      device_open
+ Description:   Open the connection to a device
+                If we were successful, device_alive will return true.
+                If we're not, we won't get registered.
+ Parameters:    device -> the device data
+ Returns:       none
+ ******************************************************************/
+void device_open(ram_device_t *device);
+
+
+/*************************************************** Gerph *********
+ Function:      device_close
+ Description:   Close the connection to a device
+                From here on, device_alive will report false.
+ Parameters:    device -> the device data
+ Returns:       none
+ ******************************************************************/
+void device_close(ram_device_t *device);
+
+/*************************************************** Gerph *********
+ Function:      device_read
+ Description:   Read the current speed
+ Parameters:    device -> the device data
+ Returns:       current speed
+ ******************************************************************/
+int device_read(ram_device_t *device);
+
+/*************************************************** Gerph *********
+ Function:      device_setspeed
+ Description:   Set the speed for the device
+ Parameters:    device -> the device data
+                speed = new speed to select
+ Returns:       current speed
+ ******************************************************************/
+int device_write(ram_device_t *device);
+
+#endif // RAM_DEVICE_H

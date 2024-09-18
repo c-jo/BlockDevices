@@ -1,0 +1,11 @@
+#ifndef RAM_IO_H
+#define RAM_IO_H
+
+#include "RAMDevice.h"
+#include "kernel.h"
+
+_kernel_oserror *ram_io(unsigned op, ram_device_t* device,
+                        unsigned flags, transfer_block_t *block);
+
+
+#endif
