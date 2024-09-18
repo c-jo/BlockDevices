@@ -170,8 +170,8 @@ add-syntax:)
 ; The module service entry will be called to process services. You are
 ; strongly recommended to include the numbers of the services you wish to
 ; handle.
-service-call-handler: Mod_Service \
- Service_BlockDevices_Started \
- Service_BlockDevices_Dying \
- Service_BlockDevices_DeviceAdded \
- Service_BlockDevices_DeviceRemoved
+;service-call-handler: Mod_Service \
+; Service_BlockDevices_Started \
+; Service_BlockDevices_Dying \
+; Service_BlockDevices_DeviceAdded \
+; Service_BlockDevices_DeviceRemoved

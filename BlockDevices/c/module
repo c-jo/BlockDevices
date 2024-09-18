@@ -27,11 +27,11 @@ static void announce(int started)
 {
     if (started)
     {
-        _swix(OS_ServiceCall, _IN(0), Service_BlockDevices_Started);
+        _swix(OS_ServiceCall, _IN(1), Service_BlockDevices_Started);
     }
     else
     {
-        _swix(OS_ServiceCall, _IN(0), Service_BlockDevices_Dying);
+        _swix(OS_ServiceCall, _IN(1), Service_BlockDevices_Dying);
     }
 }
 
@@ -78,6 +78,7 @@ _kernel_oserror *Mod_Final(int fatal, int podule_base, void *pw)
 {
     _swix(OS_RemoveCallBack, _INR(0, 1), StartupCallback_Entry, pw);
     devices_final();
+    if (running) announce(0);
     return NULL;
 }
 
@@ -146,9 +147,11 @@ _kernel_oserror *Mod_Command(const char *arg_string, int argc, int number,
                 pw = private word for module
  Returns:       none
  ******************************************************************/
+/*
 void Mod_Service(int service, _kernel_swi_regs *r, void *pw)
 {
 }
+*/
 
 /*******************************************************************
  Function:      SWI_Enumerate
