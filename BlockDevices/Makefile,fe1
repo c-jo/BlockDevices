@@ -27,7 +27,7 @@ EXPORTS    = ${EXP_C_H}.${COMPONENT}
 
 # Comma-separated list of paths to use for includes, such as:
 #	C:LibName.
-INCLUDES   = C:Asm.,C:LongLong
+INCLUDES   = C:Asm.,C:LongLong.
 
 # Space separated list of libraries to link against.
 # (${CLIB} is implicit, unless NOCLIB = yes)
