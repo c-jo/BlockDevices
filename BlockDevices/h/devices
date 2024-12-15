@@ -9,15 +9,6 @@
 
 #include "device.h"
 
-/*
-typedef struct device_s {
-    int         next_fan_id;
-    fan_t *     device;
-    fan_t **    devicetailp;
-} device_t;
-*/
-
-
 /*******************************************************************
  Function:      devices_init
  Description:   Initialise the device system
@@ -42,7 +33,7 @@ int devices_final(void);
  Parameters:    device -> the device that we're registering
  Returns:       0 if successful; 1 if failed
  ******************************************************************/
-int devices_register(device_t *device);
+int devices_register(device_t *device, void *pw);
 
 
 /*******************************************************************

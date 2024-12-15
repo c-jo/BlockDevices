@@ -22,7 +22,6 @@ typedef struct idmessages_s {
 
 
 static idmessages_t interface_names[] = {
-    { BlockDevice_Interface_Unknown, "-" },
     { BlockDevice_Interface_FDC, "FDC" },
     { BlockDevice_Interface_ST506, "ST506" },
     { BlockDevice_Interface_IDE, "ATA" },
@@ -34,11 +33,17 @@ static idmessages_t interface_names[] = {
 };
 
 static idmessages_t media_names[] = {
-    { BlockDevice_Media_Unknown, "-" },
     { BlockDevice_Media_FloppyDisc, "FloppyDisc" },
     { BlockDevice_Media_HardDisc, "HardDisc" },
     { BlockDevice_Media_Optical, "Optical" },
     { BlockDevice_Media_SSD, "SSD" },
+    { IDMESSAGE_LAST }
+};
+
+static idmessages_t partition_scheme_names[] = {
+    { BlockDevice_PartitionScheme_MBR, "MBR" },
+    { BlockDevice_PartitionScheme_GPT, "GPT" },
+    { BlockDevice_PartitionScheme_FileCore, "FileCore" },
     { IDMESSAGE_LAST }
 };
 
@@ -51,16 +56,17 @@ static idmessages_t media_names[] = {
                 def-> the default message
  Returns:       pointer to the message, or def if no value found.
  ******************************************************************/
-const char *lookup_description(int num, idmessages_t *msgs, const char *def)
+const void print_description(int num, idmessages_t *msgs)
 {
-    /* FIXME: Internationalising these message lookups could be done here if we cared */
+  /* FIXME: Internationalising these message lookups could be done here
+     if we cared */
     while (msgs->num != IDMESSAGE_LAST)
     {
-        if (msgs->num == num)
-            return msgs->message;
+        if (msgs->num == num) {
+          printf(" %s", msgs->message);
+        }
         msgs++;
     }
-    return def;
 }
 
 
@@ -73,30 +79,22 @@ const char *lookup_description(int num, idmessages_t *msgs, const char *def)
  ******************************************************************/
 _kernel_oserror *Cmd_BlockDevices(void)
 {
-    device_t *device;
+  device_t *device = NULL;
 
-    for (device = 0; (device=devices_after(device)) != NULL; )
-    {
-        char iftype[12];
-        char mediatype[12];
-        printf("%5i : %s\n",
-               (int)device->device_id,
-               device->info.name);
+  for (device = 0; (device=devices_after(device)) != NULL; )
+  {
+    printf("%5i: %s %s",
+           (int)device->device_id,
+           device->info.product,
+           device->info.name);
 
-        sprintf(iftype, "IF#%i", device->info.interface_type);
-        sprintf(mediatype, "Media#%i", device->info.media_type);
-        printf("%5s   %-8s  %-16s\n",
-               "",
-               lookup_description(device->info.interface_type, interface_names, iftype),
-               lookup_description(device->info.media_type, media_names, mediatype)
-               );
+      printf("\n       %d blocks of %d bytes",
+             device->info.block_count.lo, device->info.block_size);
 
-        printf("%5s   %-24s  %-32s  %-9s  %s\n",
-               "",
-               device->info.manufacturer ? device->info.manufacturer : "",
-               device->info.product      ? device->info.product      : "",
-               device->info.serial       ? device->info.serial       : "",
-               device->info.firmware     ? device->info.firmware     : "");
-    }
-    return NULL;
+      print_description(device->info.interface_type, interface_names);
+      print_description(device->info.media_type, media_names);
+      print_description(device->info.partition_scheme, partition_scheme_names);
+      printf("\n");
+  }
+  return NULL;
 }

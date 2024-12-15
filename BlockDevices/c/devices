@@ -8,6 +8,7 @@
 #include "kernel.h"
 
 #include "devices.h"
+#include "modhead.h"
 #include <stdio.h>
 
 #include "swis.h"
@@ -15,10 +16,12 @@
 static struct {
     int next_id;
     device_t* devices;
-    device_t** tailp;
 } devices;
 
-
+static struct notify_list_s {
+    device_t* device;
+    struct  notify_list_s *next;
+} *notify_list = 0;
 
 /*******************************************************************
  Function:      devices_notify_announce
@@ -36,6 +39,25 @@ static void device_notify_announce(device_t *device, int started)
 }
 
 /*******************************************************************
+ Function:      AnnounceCallback_Handler
+ Description:   Handler for the announce callback
+ ******************************************************************/
+_kernel_oserror *AnnounceCallback_Handler(_kernel_swi_regs *r, void *pw)
+{
+    while (notify_list) {
+        int irqs_disabled = _kernel_irqs_disabled();
+        struct notify_list_s *item = 0;
+        if (!irqs_disabled) _kernel_irqs_off();
+        item = notify_list;
+        notify_list = notify_list->next;
+        if (!irqs_disabled) _kernel_irqs_on();
+        device_notify_announce(item->device, 1);
+        free(item);
+    }
+    return NULL;
+}
+
+/*******************************************************************
  Function:      devices_init
  Description:   Initialise the block devices system
  Parameters:    none
@@ -45,7 +67,6 @@ int devices_init(void)
 {
     devices.next_id = 1;
     devices.devices = NULL;
-    devices.tailp = &devices.devices;
 
     return 0;
 }
@@ -60,7 +81,7 @@ int devices_final(void)
 {
     device_t *device = devices.devices;
     devices.devices = NULL;
-    devices.tailp = &devices.devices;
+    //devices.tailp = &devices.devices;
 
     while (device)
     {
@@ -79,20 +100,52 @@ int devices_final(void)
  Parameters:    device-> the device that we're registering
  Returns:       0 if successful; 1 if failed
  ******************************************************************/
-int devices_register(device_t *device)
+int devices_register(device_t *device, void *pw)
 {
+    int irqs_disabled;
+    struct notify_list_s *item = 0;
+
     device->device_id = devices.next_id++;
-    /* FIXME: If we've wrapped, this is not sufficient; we need to find a gap - this case is unlikely
-     *        so I don't care for now.
-     */
     device->next = NULL;
 
     /* Attach to the end of the devices list */
-    *devices.tailp = device;
+    if (devices.devices == NULL)
+    {
+      //printf("first device.");
+      devices.devices = device;
+    }
+    else// if (*devices.tailp != NULL)
+    {
+      device_t *last = devices.devices;
+      while (last->next != 0) last = last->next;
+      last->next = device;
+    }
 
-    /* Issue service that we have a new device */
-    device_notify_announce(device, 1);
+    irqs_disabled = _kernel_irqs_disabled();
+
+    // Turn IRQs off, just in case
+    if (!irqs_disabled) _kernel_irqs_off();
+
+    item = malloc(sizeof(struct notify_list_s));
+    item->device = device;
+    item->next = 0;
+
+    if (notify_list) {
+        // Add to the list
+        struct notify_list_s *last = notify_list;
+        while (last->next) last= last->next;
+        last->next = item;
+    } else {
+        // New list, add the callback
+        notify_list = item;
+        _swix(OS_AddCallBack, _INR(0,1), AnnounceCallback_Entry, pw);
+
+    }
+
+    // Turn them back on if we turned them off
+    if (!irqs_disabled) _kernel_irqs_on();
     return 0;
+
 }
 
 
@@ -119,11 +172,11 @@ int devices_deregister(int device_id)
     }
 
     /* We found the device in our list; remove it */
-    if (&cur->next == devices.tailp)
-    {
-        /* This was the last entry on the list; so move the tail pointer */
-        devices.tailp = lastp;
-    }
+//    if (&cur->next == devices.tailp)
+//    {
+//        /* This was the last entry on the list; so move the tail pointer */
+//        devices.tailp = lastp;
+//    }
     *lastp = cur->next; /* unlinks from the list */
 
     /* Issue service that we have removed a device */
@@ -158,7 +211,8 @@ device_t *devices_find(int device_id)
 /*******************************************************************
  Function:      devices_finddevice_after
  Description:   Find a device AFTER a given the device_id
- Parameters:    device_id = device id to find the device after, or 0 for the first one
+ Parameters:    device_id = device id to find the device after, or 0
+                for the first one
  Returns:       pointer to the next device, if found
                 NULL if no more devices found
  ******************************************************************/

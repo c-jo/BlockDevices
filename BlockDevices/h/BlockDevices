@@ -71,7 +71,9 @@ typedef enum media_type_e {
 typedef enum partition_scheme_e {
     BlockDevice_PartitionScheme_None = 0,
     BlockDevice_PartitionScheme_MBR = 1,
-    BlockDevice_PartitionScheme_GPT = 2
+    BlockDevice_PartitionScheme_GPT = 2,
+    BlockDevice_PartitionScheme_FileCore = 3
+
 } partition_scheme_t;
 
 // Used to control read / writes
