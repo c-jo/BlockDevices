@@ -443,7 +443,7 @@ _kernel_oserror *SWI_Register(int number, _kernel_swi_regs *r, void *pw)
     if (dev == NULL)
         return err_RegisterFailed;
 
-    if (devices_register(dev))
+    if (devices_register(dev, pw))
     {
         /* Failed to register */
         device_destroy(dev);
