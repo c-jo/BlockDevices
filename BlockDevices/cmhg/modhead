@@ -110,7 +110,8 @@ swi-decoding-table: BlockDevice \
 ; private-word: <register> Private word register
 ; carry-capable: Veneer is capable of handling returning of the
 ; carry flag
-generic-veneers: StartupCallback_Entry/StartupCallback_Handler
+generic-veneers: StartupCallback_Entry/StartupCallback_Handler, \
+    AnnounceCallback_Entry/AnnounceCallback_Handler
 
 ; The command table is one of the more complex fields in the CMHG file. The
 ; first entry is the routine to call to process the commands as they arrive.

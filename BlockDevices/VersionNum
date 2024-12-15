@@ -1,8 +1,9 @@
-/* BlockDevices (1.01)
+/* BlockDevices
  *
  * This file is automatically maintained by vmanage, do not edit manually.
  *
  */
-#define Module_MajorVersion_CMHG        1.11
+
+#define Module_MajorVersion_CMHG        1.12
 #define Module_MinorVersion_CMHG
-#define Module_Date_CMHG                15 Jul 2025
+#define Module_Date_CMHG                09 Sep 2025
