@@ -77,6 +77,14 @@ typedef struct device_info_s {
     char *      description;
 } device_info_t;
 
+// Partition schemes
+typedef enum partition_scheme_e {
+    BlockDevice_PartitionScheme_None = 0,
+    BlockDevice_PartitionScheme_MBR = 1,
+    BlockDevice_PartitionScheme_GPT = 2,
+    BlockDevice_PartitionScheme_FileCore = 3
+} partition_scheme_t;
+
 // Used to control IO operations
 typedef struct transfer_block_s {
   blockaddr_t lba;

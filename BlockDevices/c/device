@@ -60,7 +60,7 @@ device_t *device_create(
         {
             /* No name was given. Let's use an incrementing value. */
             char newname[16];
-            sprintf(newname, "device/%i", unnamed_counter++);
+            sprintf(newname, "device-%i", unnamed_counter++);
             device->info.name = strdup(newname);
             if (device->info.name == NULL)
                 goto failed;

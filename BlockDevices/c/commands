@@ -57,12 +57,21 @@ static idmessages_t media_type_names[] = {
     { IDMESSAGE_LAST }
 };
 
+
+static idmessages_t partition_scheme_names[] = {
+    { BlockDevice_PartitionScheme_MBR, "MBR" },
+    { BlockDevice_PartitionScheme_GPT, "GPT" },
+    { BlockDevice_PartitionScheme_FileCore, "FileCore" },
+    { IDMESSAGE_LAST }
+};
+
+
 /*******************************************************************
- Function:      lookup
- Description:   Look up a descriptions in a table.
- Parameters:    num = number to lookup
-                msgs-> the table of messages (idmessages_t list)
- Returns:       pointer to the message, or def if no value found.
+ Function:      format_capacity
+ Description:   Formats a capacity string
+ Parameters:    block_count, block_size = number and size of blocks
+                buffer -> where to put the resulting string.
+ Returns:       None
  ******************************************************************/
 static char *unit_names[] = { "B", "KB", "MB", "GB", "TB" };
 
@@ -93,10 +102,12 @@ const char *lookup(int num, idmessages_t *msgs)
 {
   /* FIXME: Internationalising these message lookups
      could be done here if we cared */
+
     while (msgs->num != IDMESSAGE_LAST)
     {
-        if (msgs->num == num)
-            return msgs->message;
+        if (msgs->num == num) {
+          return msgs->message;
+        }
         msgs++;
     }
     return "";
@@ -112,7 +123,7 @@ const char *lookup(int num, idmessages_t *msgs)
  ******************************************************************/
 _kernel_oserror *Cmd_BlockDevices(void)
 {
-    device_t *device;
+  device_t *device = NULL;
 
     printf("%-4s %-24s %-8s %-5s %-5s\n",
            "Dev.", "Description", "Capacity", "IFace", "Media");
@@ -143,19 +154,16 @@ _kernel_oserror *Cmd_BlockDevices(void)
     return NULL;
 }
 
-
 /*******************************************************************
  Function:      Cmd_BlockDeviceInfo
  Description:   Display information about a device.
- Parameters:
+ Parameters:    
  Returns:       pointer to an error block if failed
                 NULL if successful
  ******************************************************************/
 _kernel_oserror *Cmd_BlockDeviceInfo(const char *arg_string, int argc)
 {
-
     device_t *device=devices_find(atoi(arg_string));
-
     return NULL;
 }
 
