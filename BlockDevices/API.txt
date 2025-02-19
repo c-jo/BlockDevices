@@ -2,6 +2,8 @@ Device information block
 
 +0  device_flags:
         b0:     Device is read only
+        b1:     Device supports eject
+        b31:    Device is being debugged
         b1-31:  Must be 0
 +4  Interface and media type
         b0-15:  Interface type
@@ -100,6 +102,62 @@ Writes data to the block device.
 
 Errors:
     ReadOnly: Reported when the device is not writeable.
+
+
+SWI BlockDevices_MiscOp
+=>  R0 = device id to operate on
+    R1 = operation type:
+            b28-31:     domain:
+                            0   Device - operations that address the device itself
+                            1   Media - operations that address the media storing data
+                            2   Security - operations that control the security of data
+                            3   Sector - operations that affect sector data
+            b27         status/health request
+            b23-26      data type in R1/R2:
+                            0   opaque
+                            1   read string data in R2, length in R3
+                            2   64bit value (low in R2, high in R3)
+                            3   read data in R2, length in R3
+                            4   R2 contains a reference to a block
+                            5   R2 contains a reference to a block and block count
+                            6   R2 contains a reference to a list of blocks
+                            7   R2 contains a reference to a list of blocks and counts
+            b16-22      reserved, must be 0
+            b0-15:      dependant on the domain
+    R2-R9 dependant on operation type
+
+Performs miscellaneous operations on the block device.
+The operation code is structured such that operations can be decoded by the BlockDevices
+when debug is enabled, and to ensure that there is some consistency between the
+interfaces used.
+
+Errors:
+    ReadOnly: Reported when the device is not writeable.
+
+
+SWI BlockDevices_MiscOp &0 (PowerEject)
+=>  R0 = device id to operate on
+    R1 = 0 (device operation power eject)
+
+Requests that the block device performs an eject operation on the media.
+By necessity, the block device driver should also deregister the block device,
+as it will no longer be accessible.
+
+Errors:
+    BadMiscOp: Reported if this operation is not supported.
+
+
+SWI BlockDevices_MiscOp &1 (Identify)
+=>  R0 = device id to operate on
+    R1 = 1 (device operation: identify)
+    R2 = 1 to enable identifying light or similar
+         0 to disable identifying light
+
+Requests that the device show a light to indicate which physical device is
+being controlled.
+
+Errors:
+    BadMiscOp: Reported if this operation is not supported.
 
 
 SWI BlockDevices_Register
