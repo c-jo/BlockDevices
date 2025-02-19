@@ -9,15 +9,6 @@
 
 #include "device.h"
 
-/*
-typedef struct device_s {
-    int         next_fan_id;
-    fan_t *     device;
-    fan_t **    devicetailp;
-} device_t;
-*/
-
-
 /*******************************************************************
  Function:      devices_init
  Description:   Initialise the device system
@@ -47,8 +38,8 @@ int devices_register(device_t *device);
 
 /*******************************************************************
  Function:      device_deregister
- Description:   Deregister a fan from the system
- Parameters:    fan-> the fan that we're registering
+ Description:   Deregister a device from the system
+ Parameters:    device_id-> the id of device that we're deregistering
  Returns:       0 if successful; 1 if failed
  ******************************************************************/
 int devices_deregister(int device_id);
