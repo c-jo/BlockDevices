@@ -38,8 +38,6 @@ void device_open(device_t *device);
  ******************************************************************/
 void device_close(device_t *device);
 
-
-
 /*******************************************************************
  Function:      device_read
  Description:   Read the current speed

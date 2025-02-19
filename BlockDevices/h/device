@@ -57,12 +57,23 @@ _kernel_oserror *device_read(device_t *device, unsigned long flags, transfer_blo
  Function:      device_write
  Description:   Write data to a device.
  Parameters:    device -> the device to write to
-                flags = read flags
+                flags = write flags
                 block -> transfer block
  Returns:       pointer to an error block if failed
                 NULL if successful
  ******************************************************************/
 _kernel_oserror *device_write(device_t *device, unsigned long flags, transfer_block_t *block);
+
+/*******************************************************************
+ Function:      device_verify
+ Description:   Verify blocks on the device
+ Parameters:    device -> the device to write to
+                flags = verify flags
+                block -> transfer block (address ignored)
+ Returns:       pointer to an error block if failed
+                NULL if successful
+ ******************************************************************/
+_kernel_oserror *device_verify(device_t *device, unsigned long flags, transfer_block_t *block);
 
 /*******************************************************************
  Function:      device_miscop
