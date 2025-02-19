@@ -249,6 +249,29 @@ _kernel_oserror *SWI_Write(int number, _kernel_swi_regs *r, void *pw)
 }
 
 /*******************************************************************
+ Function:      SWI_MiscOp
+ Description:   Perform miscellaneous operations on the block device
+ Parameters:    number = SWI number
+                r -> registers block on entry for update
+                    =>  R0 =  device id
+                        R1 =  operation type
+                        R2-R9 = operation type dependant
+                pw -> module private word
+ Returns:       pointer to an error block if failed
+                NULL if successful
+ ******************************************************************/
+_kernel_oserror *SWI_MiscOp(int number, _kernel_swi_regs *r, void *pw)
+{
+    device_t *device = devices_find(r->r[0]);
+    if (device == NULL)
+        return err_BadDevice;
+
+    return device_miscop(device,
+                         (unsigned long)r->r[1],
+                         r);
+}
+
+/*******************************************************************
  Function:      SWI_Register
  Description:   Register a new block device
  Parameters:    number = SWI number

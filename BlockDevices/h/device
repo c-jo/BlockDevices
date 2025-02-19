@@ -64,4 +64,15 @@ _kernel_oserror *device_read(device_t *device, unsigned long flags, transfer_blo
  ******************************************************************/
 _kernel_oserror *device_write(device_t *device, unsigned long flags, transfer_block_t *block);
 
+/*******************************************************************
+ Function:      device_miscop
+ Description:   Perform miscellaneous operations on the device
+ Parameters:    device -> the device to write to
+                op = operation to perform
+                r-> registers for operation
+ Returns:       pointer to an error block if failed
+                NULL if successful
+ ******************************************************************/
+_kernel_oserror * device_miscop(device_t *device, unsigned long op, _kernel_swi_regs *r);
+
 #endif
