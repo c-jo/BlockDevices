@@ -82,8 +82,8 @@ swi-decoding-table: BlockDevice \
  Info/SWI_Info \
  Read/SWI_Read \
  Write/SWI_Write \
+ Verify/SWI_Verify \
  MiscOp/SWI_MiscOp \
- 5 \
  6 \
  7 \
  8 \

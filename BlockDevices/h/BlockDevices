@@ -86,9 +86,10 @@ typedef struct transfer_block_s {
 // Constants for the BlockDevice operations
 #define BlockDeviceOp_Read          (1)
 #define BlockDeviceOp_Write         (2)
+#define BlockDeviceOp_Verify        (3)
 
 /* Various operations on the BlockDevice at different levels */
-#define BlockDeviceOp_MiscOp        (3)
+#define BlockDeviceOp_MiscOp        (4)
 /* MiscOps take the form of bit field defining the type of operations:
     b28-31:     domain:
                     0   Device - operations that address the device itself
@@ -151,10 +152,10 @@ typedef struct transfer_block_s {
 #define BlockDevice_Info (BlockDevice_0 + 1)
 #define BlockDevice_Read (BlockDevice_0 + 2)
 #define BlockDevice_Write (BlockDevice_0 + 3)
-#define BlockDevice_MiscOp (BlockDevice_0 + 4)
+#define BlockDevice_Verify (BlockDevice_0 + 4)
+#define BlockDevice_MiscOp (BlockDevice_0 + 5)
 #define BlockDevice_Register (BlockDevice_0 + 16)
 #define BlockDevice_Deregister (BlockDevice_0 + 17)
-
 #endif
 
 #endif
