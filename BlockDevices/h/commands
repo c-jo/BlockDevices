@@ -11,7 +11,7 @@
 
 
 /*******************************************************************
- Function:      Cmd_Fans
+ Function:      Cmd_BlockDevices
  Description:   Display information about the block devices
  Parameters:    none
  Returns:       pointer to an error block if failed

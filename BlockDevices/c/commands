@@ -66,7 +66,7 @@ const char *lookup_description(int num, idmessages_t *msgs, const char *def)
 
 /*******************************************************************
  Function:      Cmd_BlockDevices
- Description:   Display information about the fans
+ Description:   Display information about the devices
  Parameters:    none
  Returns:       pointer to an error block if failed
                 NULL if successful
