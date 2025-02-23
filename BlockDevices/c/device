@@ -235,6 +235,30 @@ _kernel_oserror * device_write(device_t *device, unsigned long flags, transfer_b
                  BlockDeviceOp_Write, device->device_id, flags, block);
 }
 
+
+/*******************************************************************
+ Function:      device_verify
+ Description:   Verify data on a device.
+ Parameters:    device -> the device to write to
+                flags = read flags
+                block -> transfer block (address ignored)
+ Returns:       pointer to an error block if failed
+                NULL if successful
+ ******************************************************************/
+_kernel_oserror * device_verify(device_t *device, unsigned long flags, transfer_block_t *block)
+{
+    _kernel_oserror *err;
+
+    err = device_check_transfer(device, block);
+    if (err)
+        return err;
+
+    return _callx(device->driver_code, device->driver_ws,
+                 _INR(0, 3),
+                 0, device->device_id, flags, block);
+}
+
+
 /*******************************************************************
  Function:      device_miscop
  Description:   Perform miscellaneous operations on the device
@@ -249,4 +273,21 @@ _kernel_oserror * device_miscop(device_t *device, unsigned long op, _kernel_swi_
     return _callx(device->driver_code, device->driver_ws,
                  _INR(0, 3),
                  BlockDeviceOp_MiscOp, device->device_id, op, r);
+}
+
+
+/*******************************************************************
+ Function:      device_driverop
+ Description:   Perform driver operations on the device
+ Parameters:    device -> the device to write to
+                op = operation to perform
+                r-> registers for operation
+ Returns:       pointer to an error block if failed
+                NULL if successful
+ ******************************************************************/
+_kernel_oserror * device_driverop(device_t *device, unsigned long op, _kernel_swi_regs *r)
+{
+    return _callx(device->driver_code, device->driver_ws,
+                 _INR(0, 3),
+                 BlockDeviceOp_DriverOp, device->device_id, op, r);
 }

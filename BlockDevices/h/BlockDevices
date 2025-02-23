@@ -22,31 +22,13 @@
 #define DeviceId_Invalid (0)
 
 /* Flags understood in the device information block */
-#define DeviceFlag_ReadOnly         (1<<0)      /* Device cannot be written to */
-#define DeviceFlag_SupportsEject    (1<<1)      /* Supports the eject operation */
-#define DeviceFlag_Debug            (1<<31)     /* Debug enabled */
-#define DeviceFlag_Valid            ((1<<2)-1) | (1<<31)  /* Mask of the valid device flags */
+#define DeviceFlag_ReadOnly         (1u<<0)      /* Device cannot be written to */
+#define DeviceFlag_SupportsEject    (1u<<1)      /* Supports the eject operation */
+#define DeviceFlag_Debug            (1u<<31)     /* Debug enabled */
+#define DeviceFlag_Valid            ((1u<<2)-1) | (1u<<31)  /* Mask of the valid device flags */
 
 // The address of a block on a device
 typedef UINT64 blockaddr_t;
-
-// Block device info block
-typedef struct device_info_s {
-    unsigned    device_flags;
-    unsigned    interface_type:16;
-    unsigned    media_type:16;
-    unsigned    parent_device;
-    unsigned    partition_scheme:8;
-    unsigned    partition_index:24;
-    unsigned    partition_type;
-    blockaddr_t block_count;
-    unsigned    block_size;
-    char *      name;
-    char *      manufacturer;
-    char *      product;
-    char *      serial;
-    char *      firmware;
-} device_info_t;
 
 // Interface types
 typedef enum interface_type_e {
@@ -60,13 +42,25 @@ typedef enum interface_type_e {
     BlockDevice_Interface_NVMe = 7
 } interface_type_t;
 
+// Interface Connections
+typedef enum interface_connection_e {
+    BlockDevice_Interface_Connection_Unknown = 0,
+    BlockDevice_Interface_Connection_Motherboard = 1,
+    BlockDevice_Interface_Connection_Podule = 2,
+    BlockDevice_Interface_Connection_PCI = 3,
+    BlockDevice_Interface_Connection_Parallel = 4,
+    BlockDevice_Interface_Connection_Serial = 5,
+    BlockDevice_Interface_Connection_USB = 6
+} interface_connection_t;
+
 // Media types
 typedef enum media_type_e {
     BlockDevice_Media_Unknown = 0,
     BlockDevice_Media_FloppyDisc = 1,
     BlockDevice_Media_HardDisc = 2,
     BlockDevice_Media_Optical = 3,
-    BlockDevice_Media_SSD = 4
+    BlockDevice_Media_SSD = 4,
+    BlockDevice_Media_RAM = 5
 } media_type_type_t;
 
 // Partition schemes
@@ -76,7 +70,26 @@ typedef enum partition_scheme_e {
     BlockDevice_PartitionScheme_GPT = 2
 } partition_scheme_t;
 
-// Used to control read / writes
+// Block device info block
+typedef struct device_info_s {
+    unsigned    device_flags;
+    unsigned    parent_device;
+    unsigned    interface_type:8;
+    unsigned    interface_connection:8;
+    unsigned    media_type:16;
+    unsigned    partition_scheme:8;
+    unsigned    partition_index:24;
+    void*       partition_type;
+    blockaddr_t block_count;
+    unsigned    block_size;
+    char *      name;
+    char *      manufacturer;
+    char *      product;
+    char *      serial;
+    char *      firmware;
+} device_info_t;
+
+// Used to control IO operations
 typedef struct transfer_block_s {
   blockaddr_t lba;
   void *      address;
@@ -130,6 +143,8 @@ typedef struct transfer_block_s {
 #define BlockDeviceMiscOp_Media_Model        (BlockDeviceMiscOp_Media | BlockDeviceMiscOpFlag_DataString | 1)
 #define BlockDeviceMiscOp_Media_SMART        (BlockDeviceMiscOp_Media | BlockDeviceMiscOpFlag_DataData | 0)
 #define BlockDeviceMiscOp_Sector_Trim        (BlockDeviceMiscOp_Sector | 0)
+
+#define BlockDeviceOp_DriverOp        (8)
 
 #endif
 

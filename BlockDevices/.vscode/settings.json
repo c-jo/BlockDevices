@@ -1,5 +1,6 @@
 {
     "files.associations": {
-        "devices": "c"
+        "devices": "c",
+        "module": "c"
     }
 }
