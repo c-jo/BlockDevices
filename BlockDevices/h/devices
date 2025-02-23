@@ -46,6 +46,15 @@ int devices_deregister(int device_id);
 
 
 /*******************************************************************
+ Function:      device_rescan
+ Description:   Rescan the gien device.
+ Parameters:    device -> the device id to rescan
+ Returns:       0 if successful; 1 if failed
+ ******************************************************************/
+int devices_rescan(int device_id);
+
+
+/*******************************************************************
  Function:      devices_find
  Description:   Find a device given the device_id
  Parameters:    device_id = device id to find
@@ -64,5 +73,6 @@ device_t *devices_find(int device_id);
                 NULL if no more device found
  ******************************************************************/
 device_t *devices_after(device_t *device);
+
 
 #endif

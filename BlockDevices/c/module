@@ -294,6 +294,31 @@ _kernel_oserror *SWI_MiscOp(int number, _kernel_swi_regs *r, void *pw)
                          r);
 }
 
+
+/*******************************************************************
+ Function:      SWI_DriverOp
+ Description:   Perform a driver operation
+ Parameters:    number = SWI number
+                r ->registers block on entry for update
+                    => R0 = Device ID
+                    => R1 = Operation code
+                    => other registers are operation dependant
+                pw -> module private word
+ Returns:       pointer to an error block if failed
+                NULL if successful
+ ******************************************************************/
+_kernel_oserror *SWI_DriverOp(int number, _kernel_swi_regs *r, void *pw)
+{
+    device_t *device = devices_find(r->r[0]);
+    if (device == NULL)
+        return err_BadDevice;
+
+    return device_driverop(device,
+                           (unsigned long)r->r[1],
+                           r);
+}
+
+
 /*******************************************************************
  Function:      SWI_Register
  Description:   Register a new block device
@@ -337,6 +362,7 @@ _kernel_oserror *SWI_Register(int number, _kernel_swi_regs *r, void *pw)
     return NULL;
 }
 
+
 /*******************************************************************
  Function:      SWI_Deregister
  Description:   Deregister a device from the deviceController
@@ -354,6 +380,30 @@ _kernel_oserror *SWI_Deregister(int number, _kernel_swi_regs *r, void *pw)
     if (!running) return err_Starting;
 
     if (devices_deregister(device_id))
+    {
+        return err_BadDevice;
+    }
+
+    return NULL;
+}
+
+/*******************************************************************
+ Function:      SWI_Rescan
+Description:    Recans a device.
+ Parameters:    number = SWI number
+                r -> registers block on entry for update
+                    => R0 = Device identifier to deregister
+                pw -> module private word
+ Returns:       pointer to an error block if failed
+                NULL if successful
+ ******************************************************************/
+_kernel_oserror *SWI_Rescan(int number, _kernel_swi_regs *r, void *pw)
+{
+    int device_id = r->r[0];
+
+    if (!running) return err_Starting;
+
+    if (devices_rescan(device_id))
     {
         return err_BadDevice;
     }

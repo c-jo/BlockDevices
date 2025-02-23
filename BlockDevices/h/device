@@ -1,3 +1,4 @@
+
 /*******************************************************************
  * File:        device
  * Purpose:     Management of a single device
@@ -85,5 +86,16 @@ _kernel_oserror *device_verify(device_t *device, unsigned long flags, transfer_b
                 NULL if successful
  ******************************************************************/
 _kernel_oserror * device_miscop(device_t *device, unsigned long op, _kernel_swi_regs *r);
+
+/*******************************************************************
+ Function:      device_driverop
+ Description:   Perform deriver operations on the device
+ Parameters:    device -> the device to write to
+                op = operation to perform
+                r-> registers for operation
+ Returns:       pointer to an error block if failed
+                NULL if successful
+ ******************************************************************/
+_kernel_oserror * device_driverop(device_t *device, unsigned long op, _kernel_swi_regs *r);
 
 #endif
