@@ -6,23 +6,33 @@ Device information block
         b31:    Device is being debugged
         b1-31:  Must be 0
 +4  Interface and media type
-        b0-15:  Interface type
+        b0-7:  Interface type
                     0 = Unknown
                     1 = FDC
                     2 = ST506
                     3 = IDE
                     4 = SATA
                     5 = SCSI
-                    6 = USB
-                    7 = NVMe
+                    6 = NVMe
                     other: not currently defined
-        b16-31: Media type
+        b8-15:  Interface connection
+                    0 = Unknown
+                    1 = Motherboard or SOC
+                    2 = Podule
+                    3 = PCI or PCIe
+                    4 = Parallel (printer port)
+                    5 = Serial (RS232)
+                    6 = USB
+                    other: not currently defined
+        b16-23: Media type
                     0 = Unknown
                     1 = FloppyDisc
                     2 = HardDisc
                     3 = Optical
                     4 = SSD
+                    5 = RAM
                     other: not currently defined
+        b24-31:  Reserved
 +8  parent_device id, or 0 if none
 +16 parent partition details:
         b0-7:   Partition scheme:
@@ -30,35 +40,15 @@ Device information block
                     1 = MBR
                     2 = GPT
                     other: not currently defined
-        b8-15:  Partition index
-+20 partition type (using the partition scheme):
+        b8-23:  Partition index
++20 partition type (using the partition scheme)
 +24 number of blocks on device (64 bit)
-+32 size of blocks
-+36 pointer to 0-terminated string describing device name
-+40 pointer to 0-terminated string describing manufacturer
-+44 pointer to 0-terminated string describing product
-+48 pointer to 0-terminated string describing serial number
-+52 pointer to 0-terminated string describing firmware version
-
-
-Device names
-
-Device names are a `/` separated list of components which make up
-the device, in a simple tree structure. The device paths always
-start with a `/` character once registered. Identifiers within the
-device path are usually lower case, but are not case sensitive.
-They should, generally, be given as simple ASCII strings. Indexes
-given within the device name should be 0-indexed unless an existing
-naming scheme requires a different form. A separator character
-should be used for each logical component of the path.
-
-For example, a device path might take the form:
-
-/scsi/1/2/3     - The SCSI device on bus 1, device 2, LUN 3.
-/nvme/0/1       - The second disk attached to the first NVMe
-                  device.
-/nvme/0/1/gpt/0 - The first partition on the above device,
-                  using the GUID Partition Type format.
++32 size of blocks (in bytes)
++36 pointer to 0-terminated string describing device name (or zero for none)
++40 pointer to 0-terminated string describing manufacturer (or zero for none)
++44 pointer to 0-terminated string describing product (or zero for none)
++48 pointer to 0-terminated string describing serial number (or zero for none)
++52 pointer to 0-terminated string describing firmware version (or zero for none)
 
 
 SWI API
@@ -72,9 +62,16 @@ SWI BlockDevices_Enumerate
 Enumerates the currently registered devices.
 
 
+SWI BlockDevices_Info
+=>  R0 = device id
+<=  R1 = device information block
+
+Returns the device information block for the given device id.
+
+
 SWI BlockDevices_Read
 =>  R0 = device id to read to
-    R1 = flags for the read operation (?)
+    R1 = flags for the read operation (currenrly unused)
     R2 = transfer block:
             +0  64bit LBA to read
             +4  pointer to memory to read into
@@ -83,10 +80,8 @@ SWI BlockDevices_Read
 
 Reads data from the block device.
 On return from the read operation, the transfer block should return the block updated
-with a new LBA, pointer to memory and number of bytes, even if the transfer failed.
-
-FIXME: Is R2 actually a list of blocks? How is it terminated?
-What are the flags?
+with a new LBA, pointer to memory and number of bytes, even if the transfer failed. This is
+to allow the caller to retry using the same block.
 
 Errors:
     BadDevice: returned when the device id supplied is not valid.
@@ -94,7 +89,7 @@ Errors:
 
 SWI BlockDevices_Write
 =>  R0 = device id to write to
-    R1 = flags for the write operation (?)
+    R1 = flags for the write operation (currently unused)
     R2 = transfer block:
             <as for BlockDevices_Read>
 
@@ -102,6 +97,15 @@ Writes data to the block device.
 
 Errors:
     ReadOnly: Reported when the device is not writeable.
+
+
+SWI BlockDevices_Verify
+=>  R0 = device id to write to
+    R1 = flags for the write operation (currently unused)
+    R2 = transfer block:
+            <as for BlockDevices_Read>
+
+Performs a verify of the specified blocks. The address is unused.
 
 
 SWI BlockDevices_MiscOp
@@ -160,6 +164,14 @@ Errors:
     BadMiscOp: Reported if this operation is not supported.
 
 
+SWI BlockDevices_DriverOp
+=>  R0 = device id to operate on
+    all other registers are driver specfic.
+
+Performs a low-level driver operation. These are driver specific and should
+only be used where necessary, such as for driver support software.
+
+
 SWI BlockDevices_Register
 
 =>  R0 = flags (must be 0)
@@ -198,4 +210,7 @@ Entrypoint:
 =>  R0 = Operation code:
             1 => Read data
             2 => Write data
+            3 => verify
+            4 => MiscOp
+            8 => DriverOp
     R1..R9 = parameters dependant on the entry point

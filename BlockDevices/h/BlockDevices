@@ -32,35 +32,34 @@ typedef UINT64 blockaddr_t;
 
 // Interface types
 typedef enum interface_type_e {
-    BlockDevice_Interface_Unknown = 0,
-    BlockDevice_Interface_FDC = 1,
-    BlockDevice_Interface_ST506 = 2,
-    BlockDevice_Interface_IDE = 3,
-    BlockDevice_Interface_SATA = 4,
-    BlockDevice_Interface_SCSI = 5,
-    BlockDevice_Interface_USB = 6,
-    BlockDevice_Interface_NVMe = 7
+    BlockDevice_InterfaceType_Unknown = 0,
+    BlockDevice_InterfaceType_FDC = 1,
+    BlockDevice_InterfaceType_ST506 = 2,
+    BlockDevice_InterfaceType_IDE = 3,
+    BlockDevice_InterfaceType_SATA = 4,
+    BlockDevice_InterfaceType_SCSI = 5,
+    BlockDevice_InterfaceType_NVMe = 6
 } interface_type_t;
 
 // Interface Connections
 typedef enum interface_connection_e {
-    BlockDevice_Interface_Connection_Unknown = 0,
-    BlockDevice_Interface_Connection_Motherboard = 1,
-    BlockDevice_Interface_Connection_Podule = 2,
-    BlockDevice_Interface_Connection_PCI = 3,
-    BlockDevice_Interface_Connection_Parallel = 4,
-    BlockDevice_Interface_Connection_Serial = 5,
-    BlockDevice_Interface_Connection_USB = 6
+    BlockDevice_InterfaceConnection_Unknown = 0,
+    BlockDevice_InterfaceConnection_Motherboard = 1,
+    BlockDevice_InterfaceConnection_Podule = 2,
+    BlockDevice_InterfaceConnection_PCI = 3,
+    BlockDevice_InterfaceConnection_Parallel = 4,
+    BlockDevice_InterfaceConnection_Serial = 5,
+    BlockDevice_InterfaceConnection_USB = 6
 } interface_connection_t;
 
 // Media types
 typedef enum media_type_e {
-    BlockDevice_Media_Unknown = 0,
-    BlockDevice_Media_FloppyDisc = 1,
-    BlockDevice_Media_HardDisc = 2,
-    BlockDevice_Media_Optical = 3,
-    BlockDevice_Media_SSD = 4,
-    BlockDevice_Media_RAM = 5
+    BlockDevice_MediaType_Unknown = 0,
+    BlockDevice_MediaType_FloppyDisc = 1,
+    BlockDevice_MediaType_HardDisc = 2,
+    BlockDevice_MediaType_Optical = 3,
+    BlockDevice_MediaType_SSD = 4,
+    BlockDevice_MediaType_RAM = 5
 } media_type_type_t;
 
 // Partition schemes
@@ -73,13 +72,15 @@ typedef enum partition_scheme_e {
 // Block device info block
 typedef struct device_info_s {
     unsigned    device_flags;
-    unsigned    parent_device;
     unsigned    interface_type:8;
     unsigned    interface_connection:8;
-    unsigned    media_type:16;
+    unsigned    media_type:8;
+    unsigned    unused_1:8;
+    unsigned    parent_device;
     unsigned    partition_scheme:8;
-    unsigned    partition_index:24;
-    void*       partition_type;
+    unsigned    partition_index:16;
+    unsigned    unused_2:8;
+    void *      partition_type;
     blockaddr_t block_count;
     unsigned    block_size;
     char *      name;
@@ -169,6 +170,7 @@ typedef struct transfer_block_s {
 #define BlockDevice_Write (BlockDevice_0 + 3)
 #define BlockDevice_Verify (BlockDevice_0 + 4)
 #define BlockDevice_MiscOp (BlockDevice_0 + 5)
+#define BlockDevice_DriverOp (BlockDevice_0 + 8)
 #define BlockDevice_Register (BlockDevice_0 + 16)
 #define BlockDevice_Deregister (BlockDevice_0 + 17)
 #endif
