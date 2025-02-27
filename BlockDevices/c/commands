@@ -21,24 +21,23 @@ typedef struct idmessages_s {
 #define IDMESSAGE_LAST (-1)
 
 
-static idmessages_t interface_names[] = {
-    { BlockDevice_Interface_Unknown, "-" },
-    { BlockDevice_Interface_FDC, "FDC" },
-    { BlockDevice_Interface_ST506, "ST506" },
-    { BlockDevice_Interface_IDE, "ATA" },
-    { BlockDevice_Interface_SATA, "SATA" },
-    { BlockDevice_Interface_SCSI, "SCSI" },
-    { BlockDevice_Interface_USB, "USB" },
-    { BlockDevice_Interface_NVMe, "NVMe" },
+static idmessages_t interface_type_names[] = {
+    { BlockDevice_InterfaceType_Unknown, "-" },
+    { BlockDevice_InterfaceType_FDC, "FDC" },
+    { BlockDevice_InterfaceType_ST506, "ST506" },
+    { BlockDevice_InterfaceType_IDE, "ATA" },
+    { BlockDevice_InterfaceType_SATA, "SATA" },
+    { BlockDevice_InterfaceType_SCSI, "SCSI" },
+    { BlockDevice_InterfaceType_NVMe, "NVMe" },
     { IDMESSAGE_LAST }
 };
 
-static idmessages_t media_names[] = {
-    { BlockDevice_Media_Unknown, "-" },
-    { BlockDevice_Media_FloppyDisc, "FloppyDisc" },
-    { BlockDevice_Media_HardDisc, "HardDisc" },
-    { BlockDevice_Media_Optical, "Optical" },
-    { BlockDevice_Media_SSD, "SSD" },
+static idmessages_t media_type_names[] = {
+    { BlockDevice_MediaType_Unknown, "-" },
+    { BlockDevice_MediaType_FloppyDisc, "FloppyDisc" },
+    { BlockDevice_MediaType_HardDisc, "HardDisc" },
+    { BlockDevice_MediaType_Optical, "Optical" },
+    { BlockDevice_MediaType_SSD, "SSD" },
     { IDMESSAGE_LAST }
 };
 
@@ -87,8 +86,8 @@ _kernel_oserror *Cmd_BlockDevices(void)
         sprintf(mediatype, "Media#%i", device->info.media_type);
         printf("%5s   %-8s  %-16s\n",
                "",
-               lookup_description(device->info.interface_type, interface_names, iftype),
-               lookup_description(device->info.media_type, media_names, mediatype)
+               lookup_description(device->info.interface_type, interface_type_names, iftype),
+               lookup_description(device->info.media_type, media_type_names, mediatype)
                );
 
         printf("%5s   %-24s  %-32s  %-9s  %s\n",
