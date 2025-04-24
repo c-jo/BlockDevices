@@ -19,11 +19,11 @@
 #endif
 
 // Invalid device id
-#define DeviceId_Invalid (0)
+#define DeviceId_Invalid 0
 
 /* Flags understood in the device information block */
 #define DeviceFlag_ReadOnly         (1u<<0)      /* Device cannot be written to */
-#define DeviceFlag_SupportsEject    (1u<<1)      /* Supports the eject operation */
+#define DeviceFlag_CanEject         (1u<<1)      /* Supports the eject operation */
 #define DeviceFlag_Debug            (1u<<31)     /* Debug enabled */
 #define DeviceFlag_Valid            ((1u<<2)-1) | (1u<<31)  /* Mask of the valid device flags */
 
@@ -55,11 +55,13 @@ typedef enum interface_connection_e {
 // Media types
 typedef enum media_type_e {
     BlockDevice_MediaType_Unknown = 0,
-    BlockDevice_MediaType_FloppyDisc = 1,
-    BlockDevice_MediaType_HardDisc = 2,
-    BlockDevice_MediaType_Optical = 3,
-    BlockDevice_MediaType_SSD = 4,
-    BlockDevice_MediaType_RAM = 5
+    BlockDevice_MediaType_Floppy = 1,
+    BlockDevice_MediaType_HDD = 2,
+    BlockDevice_MediaType_SSD = 3,
+    BlockDevice_MediaType_RAM = 4,
+    BlockDevice_MediaType_CD = 5,
+    BlockDevice_MediaType_DVD = 6,
+    BlockDevice_MediaType_BD = 7
 } media_type_type_t;
 
 // Partition schemes
@@ -83,11 +85,7 @@ typedef struct device_info_s {
     void *      partition_type;
     blockaddr_t block_count;
     unsigned    block_size;
-    char *      name;
-    char *      manufacturer;
-    char *      product;
-    char *      serial;
-    char *      firmware;
+    char *      description;
 } device_info_t;
 
 // Used to control IO operations
@@ -97,82 +95,51 @@ typedef struct transfer_block_s {
   unsigned    count;
 } transfer_block_t;
 
-// Constants for the BlockDevice operations
-#define BlockDeviceOp_Read          (1)
-#define BlockDeviceOp_Write         (2)
-#define BlockDeviceOp_Verify        (3)
+/* Constants for the BlockDevice operations */
+#define BlockDeviceOp_Read          1
+#define BlockDeviceOp_Write         2
+#define BlockDeviceOp_Verify        3
 
-/* Various operations on the BlockDevice at different levels */
-#define BlockDeviceOp_MiscOp        (4)
-/* MiscOps take the form of bit field defining the type of operations:
-    b28-31:     domain:
-                    0   Device - operations that address the device itself
-                    1   Media - operations that address the media storing data
-                    2   Security - operations that control the security of data
-                    3   Sector - operations that affect sector data
-    b27         status/health request
-    b23-26      data type in R1/R2:
-                    0   opaque
-                    1   read string data in R2, length in R3
-                    2   64bit value (low in R2, high in R3)
-                    3   read data in R2, length in R3
-                    4   R2 contains a reference to a block
-                    5   R2 contains a reference to a block and block count
-                    6   R2 contains a reference to a list of blocks
-                    7   R2 contains a reference to a list of blocks and counts
-    b16-22      reserved, must be 0
-    b0-15:      dependant on the domain
- */
-#define BlockDeviceMiscOp_Device      (0<<28)
-#define BlockDeviceMiscOp_Media       (1<<28)
-#define BlockDeviceMiscOp_Sector      (2<<28)
-#define BlockDeviceMiscOp_Security    (3<<28)
-#define BlockDeviceMiscOpFlag_Status  (1<<27)
-#define BlockDeviceMiscOpFlag_DataOpaque  (0<<23)
-#define BlockDeviceMiscOpFlag_DataString  (1<<23)
-#define BlockDeviceMiscOpFlag_Data64Bit   (2<<23)
-#define BlockDeviceMiscOpFlag_DataData    (3<<23)
-#define BlockDeviceMiscOpFlag_DataBlock             (4<<23)
-#define BlockDeviceMiscOpFlag_DataBlockAndCount     (5<<23)
-#define BlockDeviceMiscOpFlag_DataBlocks            (6<<23)
-#define BlockDeviceMiscOpFlag_DataBlocksAndCounts   (7<<23)
+/* Various operations on the BlockDevice */
+#define BlockDeviceOp_DeviceOp      4
+#define BlockDeviceOp_MediaOp       5
+#define BlockDeviceOp_SecurityOp    6
+#define BlockDeviceOp_SectorOp      7
 
-/* Reserved device operations (not currently defined but set aside for now) */
-#define BlockDeviceMiscOp_Device_PowerEject  (BlockDeviceMiscOp_Device | 0) /* Eject the media, removing block device */
-#define BlockDeviceMiscOp_Device_Identify    (BlockDeviceMiscOp_Device | 1) /* Flash a light or something */
-#define BlockDeviceMiscOp_Media_Manufacturer (BlockDeviceMiscOp_Media | BlockDeviceMiscOpFlag_DataString | 0)
-#define BlockDeviceMiscOp_Media_Model        (BlockDeviceMiscOp_Media | BlockDeviceMiscOpFlag_DataString | 1)
-#define BlockDeviceMiscOp_Media_SMART        (BlockDeviceMiscOp_Media | BlockDeviceMiscOpFlag_DataData | 0)
-#define BlockDeviceMiscOp_Sector_Trim        (BlockDeviceMiscOp_Sector | 0)
+/* Low-level driver operation on the BlockDevice */
+#define BlockDeviceOp_DriverOp      8
 
-#define BlockDeviceOp_DriverOp        (8)
+/* MiscOps */
+#define BlockDeviceOp_DeviceOp_SMART 0x54524D53
+#define BlockDeviceOp_SectorOp_TRIM  0x4D495254
 
 #endif
 
 // Service calls
-#define ServiceBase_BlockDevices 0x81200
-#define Service_BlockDevices_Started (ServiceBase_BlockDevices + 0)
-#define Service_BlockDevices_Dying (ServiceBase_BlockDevices + 1)
-#define Service_BlockDevices_DeviceAdded (ServiceBase_BlockDevices + 2)
-#define Service_BlockDevices_DeviceRemoved (ServiceBase_BlockDevices + 3)
+#define Service_BlockDevices_Started 0x81200
+#define Service_BlockDevices_Dying 0x81201
+#define Service_BlockDevices_DeviceAdded 0x81202
+#define Service_BlockDevices_DeviceRemoved 0x81203
 
 // Error numbers
 #define ErrorBase_BlockDevices 0x822300
-#define ErrorNumber_NoSuchDevice (ErrorBase_BlockDevices + 0)
-#define ErrorNumber_DeviceInUse (ErrorBase_BlockDevices + 1)
+#define ErrorNumber_NoSuchDevice 0x822300
+#define ErrorNumber_DeviceInUse 0x822301
 
 // SWI numbers
-#ifndef BlockDevice_Enumerate
 #define BlockDevice_0 0x5A6C0
-#define BlockDevice_Enumerate (BlockDevice_0 + 0)
-#define BlockDevice_Info (BlockDevice_0 + 1)
-#define BlockDevice_Read (BlockDevice_0 + 2)
-#define BlockDevice_Write (BlockDevice_0 + 3)
-#define BlockDevice_Verify (BlockDevice_0 + 4)
-#define BlockDevice_MiscOp (BlockDevice_0 + 5)
-#define BlockDevice_DriverOp (BlockDevice_0 + 8)
-#define BlockDevice_Register (BlockDevice_0 + 16)
-#define BlockDevice_Deregister (BlockDevice_0 + 17)
-#endif
+#define BlockDevice_Info 0x5A6C0
+#define BlockDevice_Read 0x5A6C1
+#define BlockDevice_Write 0x5A6C2
+#define BlockDevice_Verify 0x5A6C3
+#define BlockDevice_DeviceOp 0x5A6C4
+#define BlockDevice_MediaOp 0x5A6C5
+#define BlockDevice_SecurityOp 0x5A6C6
+#define BlockDevice_SectorOp 0x5A6C7
+#define BlockDevice_DriverOp 0x5A6C8
+#define BlockDevice_Register 0x5A6D0
+#define BlockDevice_Deregister 0x5A6D1
+#define BlockDevice_Enumerate 0x5A6D2
+#define BlockDevice_Rescan 0x5A6D3
 
 #endif
