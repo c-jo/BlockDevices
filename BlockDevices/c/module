@@ -25,7 +25,6 @@ static int running;
  ******************************************************************/
 static void announce(int started)
 {
-    printf("aoounce(%d)\n", started);
     if (started)
     {
         _swix(OS_ServiceCall, _IN(1), Service_BlockDevices_Started);
@@ -138,20 +137,6 @@ _kernel_oserror *Mod_Command(const char *arg_string, int argc, int number,
     return NULL;
 }
 
-
-/*******************************************************************
- Function:      Mod_Service
- Description:   Service call handler
- Parameters:    service = service number
-                r  = pointer to register block on entry
-                pw = private word for module
- Returns:       none
- ******************************************************************/
-/*
-void Mod_Service(int service, _kernel_swi_regs *r, void *pw)
-{
-}
-*/
 
 /*******************************************************************
  Function:      SWI_Enumerate
@@ -294,7 +279,6 @@ _kernel_oserror *SWI_DeviceOp(int number, _kernel_swi_regs *r, void *pw)
 
     return device_miscop(device,
                          BlockDeviceOp_DeviceOp,
-                         (unsigned long)r->r[1],
                          r);
 }
 
@@ -318,7 +302,6 @@ _kernel_oserror *SWI_MediaOp(int number, _kernel_swi_regs *r, void *pw)
 
     return device_miscop(device,
                          BlockDeviceOp_MediaOp,
-                         (unsigned long)r->r[1],
                          r);
 }
 
@@ -342,7 +325,6 @@ _kernel_oserror *SWI_SecurityOp(int number, _kernel_swi_regs *r, void *pw)
 
     return device_miscop(device,
                          BlockDeviceOp_SecurityOp,
-                         (unsigned long)r->r[1],
                          r);
 }
 
@@ -366,7 +348,6 @@ _kernel_oserror *SWI_SectorOp(int number, _kernel_swi_regs *r, void *pw)
 
     return device_miscop(device,
                          BlockDeviceOp_SectorOp,
-                         (unsigned long)r->r[1],
                          r);
 }
 
@@ -388,9 +369,9 @@ _kernel_oserror *SWI_DriverOp(int number, _kernel_swi_regs *r, void *pw)
     if (device == NULL)
         return err_BadDevice;
 
-    return device_driverop(device,
-                           (unsigned long)r->r[1],
-                           r);
+    return device_miscop(device,
+                         BlockDeviceOp_DriverOp,
+                         r);
 }
 
 
@@ -403,6 +384,7 @@ _kernel_oserror *SWI_DriverOp(int number, _kernel_swi_regs *r, void *pw)
                        R1 -> Device info block
                        R2 -> Code entry point
                        R3 -> Code entry workspace
+                       R4 -> Code entry reference
                     <= R0  = device identifier allocated
                 pw -> module private word
  Returns:       pointer to an error block if failed
@@ -412,7 +394,8 @@ _kernel_oserror *SWI_Register(int number, _kernel_swi_regs *r, void *pw)
 {
     device_info_t *info = (device_info_t *)r->r[1];
     void *driver_code = (void *)r->r[2];
-    void *driver_ws = (void *)r->r[3];
+    void *driver_ws   = (void *)r->r[3];
+    void *driver_ref  = (void *)r->r[4];
     device_t *dev;
 
     if (!running) return err_Starting;
@@ -421,7 +404,7 @@ _kernel_oserror *SWI_Register(int number, _kernel_swi_regs *r, void *pw)
 //        return err_RegisterFailedFlags; /* They gave unsupported flags */
 
     dev = device_create(
-        info, driver_code, driver_ws);
+        info, driver_code, driver_ws, driver_ref);
 
     if (dev == NULL)
         return err_RegisterFailed;

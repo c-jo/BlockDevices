@@ -75,7 +75,6 @@ static void format_capacity(UINT64 block_count, unsigned block_size, char *buffe
     value = value * block_size;
 
     while (value > 9999 && units < 5) {
-      //LL_DIV(capacity, capacity, divider);
       value = value / 1024.0;
       units += 1;
     }

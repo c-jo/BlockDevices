@@ -95,6 +95,16 @@ typedef struct transfer_block_s {
   unsigned    count;
 } transfer_block_t;
 
+// Block sizes
+typedef struct block_size_s {
+  unsigned size;      // Block size, in bytes
+  unsigned flags;     // Flags
+  struct {
+    signed value;        // Relative priority
+    char  *description;  // Priority description (optional)
+  } priority;
+} block_size_t;
+
 /* Constants for the BlockDevice operations */
 #define BlockDeviceOp_Read          1
 #define BlockDeviceOp_Write         2
@@ -110,24 +120,34 @@ typedef struct transfer_block_s {
 #define BlockDeviceOp_DriverOp      8
 
 /* MiscOps */
-#define BlockDeviceOp_DeviceOp_SMART 0x54524D53
-#define BlockDeviceOp_SectorOp_TRIM  0x4D495254
+#define BlockDeviceOp_DeviceOp_SMART 0x54524D53 // SMRT
 
+#define BlockDeviceOp_DeviceOp_SerialNumber 0x4c524553 // SERL
+#define BlockDeviceOp_DeviceOp_ModelName    0x4c444f4d // MODL
+#define BlockDeviceOp_DeviceOp_Firmware     0x45525746 // FWRE
+
+#define BlockDeviceOp_SectorOp_TRIM 0x4D495254 // TRIM
+
+#define BlockDeviceOp_MediaOp_BlockSizes   0x5a534b42 // BKSZ
+#define BlockDeviceOp_MediaOp_SetBlockSize 0x5a534253 // SBSZ
 #endif
 
 // Service calls
-#define Service_BlockDevices_Started 0x81200
-#define Service_BlockDevices_Dying 0x81201
-#define Service_BlockDevices_DeviceAdded 0x81202
+#define Service_BlockDevices_Started       0x81200
+#define Service_BlockDevices_Dying         0x81201
+#define Service_BlockDevices_DeviceAdded   0x81202
 #define Service_BlockDevices_DeviceRemoved 0x81203
 
 // Error numbers
-#define ErrorBase_BlockDevices 0x822300
+#define ErrorBase_BlockDevices   0x822300
 #define ErrorNumber_NoSuchDevice 0x822300
-#define ErrorNumber_DeviceInUse 0x822301
+#define ErrorNumber_DeviceInUse  0x822301
 
 // SWI numbers
+#ifndef BlockDevice_0
 #define BlockDevice_0 0x5A6C0
+#endif
+#ifndef BlockDevice_Info
 #define BlockDevice_Info 0x5A6C0
 #define BlockDevice_Read 0x5A6C1
 #define BlockDevice_Write 0x5A6C2
@@ -141,5 +161,6 @@ typedef struct transfer_block_s {
 #define BlockDevice_Deregister 0x5A6D1
 #define BlockDevice_Enumerate 0x5A6D2
 #define BlockDevice_Rescan 0x5A6D3
+#endif
 
 #endif
