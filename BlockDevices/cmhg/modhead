@@ -78,14 +78,14 @@ finalisation-code: Mod_Final
 ; register your SWI prefixes when you register a SWI chunk. Each name entry
 ; may be followed by /<entry> to use a particular routine to handle a SWI.
 swi-decoding-table: BlockDevice \
- Enumerate/SWI_Enumerate \
  Info/SWI_Info \
  Read/SWI_Read \
  Write/SWI_Write \
  Verify/SWI_Verify \
- MiscOp/SWI_MiscOp \
- 6 \
- 7 \
+ DeviceOp/SWI_DeviceOp \
+ MediaOp/SWI_MediaOp \
+ SecurityOp/SWI_SecurityOp \
+ SectorOp/SWI_SectorOp \
  DriverOp/SWI_DriverOp \
  9 \
  10 \
@@ -96,6 +96,7 @@ swi-decoding-table: BlockDevice \
  15 \
  Register/SWI_Register \
  Deregister/SWI_Deregister \
+ Enumerate/SWI_Enumerate \
  Rescan/SWI_Rescan
 
 ; Generic veneers are used to provide a simple C environment for SVC and IRQ

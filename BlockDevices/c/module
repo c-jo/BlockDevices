@@ -57,8 +57,7 @@ _kernel_oserror *Mod_Init(const char *tail, int podule_base, void *pw)
         return err_InitFailed;
     }
 
-    _swix(OS_AddCallBack, _INR(0, 1), StartupCallback_Entry, pw);
-    return NULL;
+    return _swix(OS_AddCallBack, _INR(0, 1), StartupCallback_Entry, pw);
 }
 
 
@@ -140,20 +139,6 @@ _kernel_oserror *Mod_Command(const char *arg_string, int argc, int number,
 
 
 /*******************************************************************
- Function:      Mod_Service
- Description:   Service call handler
- Parameters:    service = service number
-                r  = pointer to register block on entry
-                pw = private word for module
- Returns:       none
- ******************************************************************/
-/*
-void Mod_Service(int service, _kernel_swi_regs *r, void *pw)
-{
-}
-*/
-
-/*******************************************************************
  Function:      SWI_Enumerate
  Description:   Enumerate the devices that we have registered
  Parameters:    number = SWI number
@@ -220,9 +205,10 @@ _kernel_oserror *SWI_Read(int number, _kernel_swi_regs *r, void *pw)
     if (device == NULL)
         return err_BadDevice;
 
-    return device_read(device,
-                       (unsigned long)r->r[1],
-                       (transfer_block_t*)r->r[2]);
+    return device_transfer(device,
+                           BlockDeviceOp_Read,
+                           (unsigned long)r->r[1],
+                           (transfer_block_t*)r->r[2]);
 }
 
 /*******************************************************************
@@ -243,9 +229,10 @@ _kernel_oserror *SWI_Write(int number, _kernel_swi_regs *r, void *pw)
     if (device == NULL)
         return err_BadDevice;
 
-    return device_write(device,
-                        (unsigned long)r->r[1],
-                        (transfer_block_t*)r->r[2]);
+    return device_transfer(device,
+                           BlockDeviceOp_Write,
+                           (unsigned long)r->r[1],
+                           (transfer_block_t*)r->r[2]);
 }
 
 /*******************************************************************
@@ -266,14 +253,15 @@ _kernel_oserror *SWI_Verify(int number, _kernel_swi_regs *r, void *pw)
     if (device == NULL)
         return err_BadDevice;
 
-    return device_verify(device,
-                         (unsigned long)r->r[1],
-                         (transfer_block_t*)r->r[2]);
+    return device_transfer(device,
+                           BlockDeviceOp_Verify,
+                           (unsigned long)r->r[1],
+                           (transfer_block_t*)r->r[2]);
 }
 
 /*******************************************************************
- Function:      SWI_MiscOp
- Description:   Perform miscellaneous operations on the block device
+ Function:      SWI_DeviceOp
+ Description:   Perform miscellaneous device operations on the device
  Parameters:    number = SWI number
                 r -> registers block on entry for update
                     =>  R0 =  device id
@@ -283,17 +271,85 @@ _kernel_oserror *SWI_Verify(int number, _kernel_swi_regs *r, void *pw)
  Returns:       pointer to an error block if failed
                 NULL if successful
  ******************************************************************/
-_kernel_oserror *SWI_MiscOp(int number, _kernel_swi_regs *r, void *pw)
+_kernel_oserror *SWI_DeviceOp(int number, _kernel_swi_regs *r, void *pw)
 {
     device_t *device = devices_find(r->r[0]);
     if (device == NULL)
         return err_BadDevice;
 
     return device_miscop(device,
-                         (unsigned long)r->r[1],
+                         BlockDeviceOp_DeviceOp,
                          r);
 }
 
+/*******************************************************************
+ Function:      SWI_DeviceOp
+ Description:   Perform miscellaneous media operations on the device
+ Parameters:    number = SWI number
+                r -> registers block on entry for update
+                    =>  R0 =  device id
+                        R1 =  operation type
+                        R2-R9 = operation type dependant
+                pw -> module private word
+ Returns:       pointer to an error block if failed
+                NULL if successful
+ ******************************************************************/
+_kernel_oserror *SWI_MediaOp(int number, _kernel_swi_regs *r, void *pw)
+{
+    device_t *device = devices_find(r->r[0]);
+    if (device == NULL)
+        return err_BadDevice;
+
+    return device_miscop(device,
+                         BlockDeviceOp_MediaOp,
+                         r);
+}
+
+/*******************************************************************
+ Function:      SWI_SecurityOp
+ Description:   Perform miscellaneous security operations on the device
+ Parameters:    number = SWI number
+                r -> registers block on entry for update
+                    =>  R0 =  device id
+                        R1 =  operation type
+                        R2-R9 = operation type dependant
+                pw -> module private word
+ Returns:       pointer to an error block if failed
+                NULL if successful
+ ******************************************************************/
+_kernel_oserror *SWI_SecurityOp(int number, _kernel_swi_regs *r, void *pw)
+{
+    device_t *device = devices_find(r->r[0]);
+    if (device == NULL)
+        return err_BadDevice;
+
+    return device_miscop(device,
+                         BlockDeviceOp_SecurityOp,
+                         r);
+}
+
+/*******************************************************************
+ Function:      SWI_SecorOp
+ Description:   Perform miscellaneous sector operations on the device
+ Parameters:    number = SWI number
+                r -> registers block on entry for update
+                    =>  R0 =  device id
+                        R1 =  operation type
+                        R2-R9 = operation type dependant
+                pw -> module private word
+ Returns:       pointer to an error block if failed
+                NULL if successful
+ ******************************************************************/
+_kernel_oserror *SWI_SectorOp(int number, _kernel_swi_regs *r, void *pw)
+{
+    device_t *device = devices_find(r->r[0]);
+    if (device == NULL)
+        return err_BadDevice;
+
+    return device_miscop(device,
+                         BlockDeviceOp_SectorOp,
+                         r);
+}
 
 /*******************************************************************
  Function:      SWI_DriverOp
@@ -313,9 +369,9 @@ _kernel_oserror *SWI_DriverOp(int number, _kernel_swi_regs *r, void *pw)
     if (device == NULL)
         return err_BadDevice;
 
-    return device_driverop(device,
-                           (unsigned long)r->r[1],
-                           r);
+    return device_miscop(device,
+                         BlockDeviceOp_DriverOp,
+                         r);
 }
 
 
@@ -328,6 +384,7 @@ _kernel_oserror *SWI_DriverOp(int number, _kernel_swi_regs *r, void *pw)
                        R1 -> Device info block
                        R2 -> Code entry point
                        R3 -> Code entry workspace
+                       R4 -> Code entry reference
                     <= R0  = device identifier allocated
                 pw -> module private word
  Returns:       pointer to an error block if failed
@@ -337,16 +394,17 @@ _kernel_oserror *SWI_Register(int number, _kernel_swi_regs *r, void *pw)
 {
     device_info_t *info = (device_info_t *)r->r[1];
     void *driver_code = (void *)r->r[2];
-    void *driver_ws = (void *)r->r[3];
+    void *driver_ws   = (void *)r->r[3];
+    void *driver_ref  = (void *)r->r[4];
     device_t *dev;
 
     if (!running) return err_Starting;
 
-    if (info->device_flags & DeviceFlag_Valid)
-        return err_RegisterFailedFlags; /* They gave unsupported flags */
+//    if (info->device_flags & DeviceFlag_Valid)
+//        return err_RegisterFailedFlags; /* They gave unsupported flags */
 
     dev = device_create(
-        info, driver_code, driver_ws);
+        info, driver_code, driver_ws, driver_ref);
 
     if (dev == NULL)
         return err_RegisterFailed;
