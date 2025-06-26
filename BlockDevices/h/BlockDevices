@@ -122,11 +122,34 @@ typedef struct block_size_s {
 /* MiscOps */
 #define BlockDeviceOp_DeviceOp_SMART 0x54524D53 // SMRT
 
+typedef struct smart_attribute_header_s {
+  unsigned status:8;
+  unsigned flags:16;
+  unsigned value_size:8;
+  unsigned reserved:8;
+  unsigned attribute_type:8;
+  unsigned attribute_id:16;
+} smart_attribute_header_t;
+
+#define SMART_Attribute_Header_Status_OK       0x00
+#define SMART_Attribute_Header_Status_Warning  0x01
+#define SMART_Attribute_Header_Status_Critical 0x02
+#define SMART_Attribute_Header_Status_Failure  0x03
+
+#define SMART_Attribute_Header_Flags_Higher_Is_Better  1
+#define SMART_Attribute_Header_Flags_Threshold_Present 2
+#define SMART_Attribute_Header_Flags_Critical_Present  4
+
+#define SMART_Attribute_Header_Attribute_Type_General 0x00
+#define SMART_Attribute_Header_Attribute_Type_IDE     0x01
+#define SMART_Attribute_Header_Attribute_Type_SCSI    0x02
+#define SMART_Attribute_Header_Attribute_Type_NVMe    0x03
+
 #define BlockDeviceOp_DeviceOp_SerialNumber 0x4c524553 // SERL
 #define BlockDeviceOp_DeviceOp_ModelName    0x4c444f4d // MODL
 #define BlockDeviceOp_DeviceOp_Firmware     0x45525746 // FWRE
 
-#define BlockDeviceOp_SectorOp_TRIM 0x4D495254 // TRIM
+#define BlockDeviceOp_SectorOp_TRIM  0x4D495254 // TRIM
 
 #define BlockDeviceOp_MediaOp_BlockSizes   0x5a534b42 // BKSZ
 #define BlockDeviceOp_MediaOp_SetBlockSize 0x5a534253 // SBSZ
@@ -139,7 +162,7 @@ typedef struct block_size_s {
 #define Service_BlockDevices_DeviceRemoved 0x81203
 
 // Error numbers
-#define ErrorBase_BlockDevices   0x822300
+#define ErrorBase_BlockDevices 0x822300
 #define ErrorNumber_NoSuchDevice 0x822300
 #define ErrorNumber_DeviceInUse  0x822301
 
