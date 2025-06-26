@@ -32,34 +32,74 @@ static idmessages_t interface_type_names[] = {
     { IDMESSAGE_LAST }
 };
 
-static idmessages_t media_type_names[] = {
-    { BlockDevice_MediaType_Unknown, "-" },
-    { BlockDevice_MediaType_FloppyDisc, "FloppyDisc" },
-    { BlockDevice_MediaType_HardDisc, "HardDisc" },
-    { BlockDevice_MediaType_Optical, "Optical" },
-    { BlockDevice_MediaType_SSD, "SSD" },
+
+static idmessages_t interface_connection_names[] = {
+    { BlockDevice_InterfaceConnection_Unknown, "-" },
+    { BlockDevice_InterfaceConnection_Motherboard, "M/B" },
+    { BlockDevice_InterfaceConnection_Podule, "Podule" },
+    { BlockDevice_InterfaceConnection_PCI, "PCI" },
+    { BlockDevice_InterfaceConnection_Parallel, "Paralllel" },
+    { BlockDevice_InterfaceConnection_Serial, "Serial" },
+    { BlockDevice_InterfaceConnection_USB, "USB" },
     { IDMESSAGE_LAST }
 };
 
 
+static idmessages_t media_type_names[] = {
+    { BlockDevice_MediaType_Unknown, "-" },
+    { BlockDevice_MediaType_Floppy, "Floppy" },
+    { BlockDevice_MediaType_HDD, "HDD" },
+    { BlockDevice_MediaType_SSD, "SSD" },
+    { BlockDevice_MediaType_RAM, "RAM" },
+    { BlockDevice_MediaType_CD, "CD" },
+    { BlockDevice_MediaType_DVD, "DVD" },
+    { BlockDevice_MediaType_BD, "BD" },
+    { IDMESSAGE_LAST }
+};
+
 /*******************************************************************
- Function:      lookup_description
+ Function:      lookup
  Description:   Look up a descriptions in a table.
  Parameters:    num = number to lookup
                 msgs-> the table of messages (idmessages_t list)
-                def-> the default message
  Returns:       pointer to the message, or def if no value found.
  ******************************************************************/
-const char *lookup_description(int num, idmessages_t *msgs, const char *def)
+static char *unit_names[] = { "B", "KB", "MB", "GB", "TB" };
+
+static void format_capacity(UINT64 block_count, unsigned block_size, char *buffer)
 {
-    /* FIXME: Internationalising these message lookups could be done here if we cared */
+    unsigned long count, units = 0;
+    float value;
+    LL_L2UI(count, block_count);
+    value = count;
+    value = value * block_size;
+
+    while (value > 9999 && units < 5) {
+      value = value / 1024.0;
+      units += 1;
+    }
+
+    sprintf(buffer, "%0.1f %s", value, unit_names[units]);
+}
+
+/*******************************************************************
+ Function:      lookup
+ Description:   Look up a descriptions in a table.
+ Parameters:    num = number to lookup
+                msgs-> the table of messages (idmessages_t list)
+ Returns:       pointer to the message, or def if no value found.
+ ******************************************************************/
+const char *lookup(int num, idmessages_t *msgs)
+{
+  /* FIXME: Internationalising these message lookups
+     could be done here if we cared */
     while (msgs->num != IDMESSAGE_LAST)
     {
         if (msgs->num == num)
             return msgs->message;
         msgs++;
     }
-    return def;
+    return "";
 }
 
 
@@ -74,28 +114,31 @@ _kernel_oserror *Cmd_BlockDevices(void)
 {
     device_t *device;
 
+    printf("%-4s %-24s %-8s %-5s %-5s\n",
+           "Dev.", "Description", "Capacity", "IFace", "Media");
+
+
     for (device = 0; (device=devices_after(device)) != NULL; )
     {
-        char iftype[12];
-        char mediatype[12];
-        printf("%5i : %s\n",
+        char capacity[6];
+
+        format_capacity(device->info.block_count, device->info.block_size, capacity);
+
+        printf("%-4i %-24s %-8s %-5s %-5s\n",
                (int)device->device_id,
-               device->info.name);
-
-        sprintf(iftype, "IF#%i", device->info.interface_type);
-        sprintf(mediatype, "Media#%i", device->info.media_type);
-        printf("%5s   %-8s  %-16s\n",
-               "",
-               lookup_description(device->info.interface_type, interface_type_names, iftype),
-               lookup_description(device->info.media_type, media_type_names, mediatype)
+               device->info.description,
+               capacity,
+               lookup(device->info.interface_type, interface_type_names),
+               lookup(device->info.media_type, media_type_names)
                );
-
+/*
         printf("%5s   %-24s  %-32s  %-9s  %s\n",
                "",
                device->info.manufacturer ? device->info.manufacturer : "",
                device->info.product      ? device->info.product      : "",
                device->info.serial       ? device->info.serial       : "",
                device->info.firmware     ? device->info.firmware     : "");
+*/
     }
     return NULL;
 }

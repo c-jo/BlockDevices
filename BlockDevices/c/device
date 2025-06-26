@@ -18,24 +18,22 @@
 
 #include <stdio.h>
 
-/* A counter to use for unnamed devices */
-static int unnamed_counter = 1;
-
 
 /*******************************************************************
  Function:      device_create
  Description:   Create a reference to a device
- Parameters:    location_id = location of the device
+ Parameters:    info -> information about the device
                 capabilities = capabilities flags
-                provider -> provider name (will be copied)
                 driver_code -> the code to call for the driver
                 driver_ws -> r12 value for the driver
+                driver_ref -> reference to pass to the driver in R9
  Returns:       pointer to the device_t, or NULL if failed
  ******************************************************************/
 device_t *device_create(
               device_info_t * info,
               void *          driver_code,
-              void *          driver_ws)
+              void *          driver_ws,
+              void *          driver_ref)
 {
     device_t *device;
 
@@ -44,16 +42,17 @@ device_t *device_create(
         goto failed;
 
     /* Copy the fields to our device information block */
-    device->info.device_flags        = info->device_flags;
-    device->info.interface_type      = info->interface_type;
-    device->info.media_type          = info->media_type;
-    device->info.parent_device       = info->parent_device;
-    device->info.partition_scheme    = info->partition_scheme;
-    device->info.partition_index     = info->partition_index;
-    device->info.partition_type      = info->partition_type;
-    device->info.block_count         = info->block_count;
-    device->info.block_size          = info->block_size;
+    device->info.device_flags     = info->device_flags;
+    device->info.interface_type   = info->interface_type;
+    device->info.media_type       = info->media_type;
+    device->info.parent_device    = info->parent_device;
+    device->info.partition_scheme = info->partition_scheme;
+    device->info.partition_index  = info->partition_index;
+    device->info.partition_type   = info->partition_type;
+    device->info.block_count      = info->block_count;
+    device->info.block_size       = info->block_size;
 
+  #if 0
     /* Allocations for the name are slightly harder.
      * The name on registration can be just a simple string, or it might be a device path.
      * If it's a simple string, we need to construct a path based on the parents.
@@ -99,6 +98,7 @@ device_t *device_create(
             strcpy(device->info.name + 1, info->name);
         }
     }
+#endif
 
     /* The other strings are easier to copy */
 #define STRDUP_OR_FAIL(_to, _from) \
@@ -115,30 +115,33 @@ device_t *device_create(
         } \
     } while (0)
 
-    STRDUP_OR_FAIL(device->info.manufacturer, info->manufacturer);
-    STRDUP_OR_FAIL(device->info.product, info->product);
-    STRDUP_OR_FAIL(device->info.serial, info->serial);
-    STRDUP_OR_FAIL(device->info.firmware, info->firmware);
+//    STRDUP_OR_FAIL(device->info.manufacturer, info->manufacturer);
+//    STRDUP_OR_FAIL(device->info.product, info->product);
+//    STRDUP_OR_FAIL(device->info.serial, info->serial);
+//    STRDUP_OR_FAIL(device->info.firmware, info->firmware);
+    STRDUP_OR_FAIL(device->info.description, info->description);
 
     device->driver_code = driver_code;
     device->driver_ws = driver_ws;
+    device->driver_ref = driver_ref;
 
     return device;
 
 failed:
     if (device)
     {
-        free(device->info.name);
-        free(device->info.manufacturer);
-        free(device->info.product);
-        free(device->info.serial);
-        free(device->info.firmware);
-        free(device);
+//        free(device->info.name);
+//        free(device->info.manufacturer);
+//        free(device->info.product);
+//        free(device->info.serial);
+//        free(device->info.firmware);
+          free(device->info.description);
+          free(device);
     }
     return NULL;
 }
 
-/*************************************************** Gerph *********
+/*******************************************************************
  Function:      device_check_transfer
  Description:   Check whether a transfer would be valid
  Parameters:    device-> the device we're operating on
@@ -174,78 +177,33 @@ void device_destroy(device_t *device)
 {
     if (device)
     {
-        free(device->info.name);
-        device->info.manufacturer = NULL;
-        free(device->info.manufacturer);
-        device->info.manufacturer = NULL;
-        free(device->info.product);
-        device->info.product = NULL;
-        free(device->info.serial);
-        device->info.serial = NULL;
-        free(device->info.firmware);
-        device->info.firmware = NULL;
+//        free(device->info.name);
+//        device->info.manufacturer = NULL;
+//        free(device->info.manufacturer);
+//        device->info.manufacturer = NULL;
+//        free(device->info.product);
+//        device->info.product = NULL;
+//        free(device->info.serial);
+//        device->info.serial = NULL;
+//        free(device->info.firmware);
+//        device->info.firmware = NULL;
+        free(device->info.description);
         free(device);
     }
 }
 
 
 /*******************************************************************
- Function:      device_read
- Description:   Read data from a device.
- Parameters:    device -> the device to read from
-                flags = read flags
+ Function:      device_transfer
+ Description:   Transfer data to or from a device.
+ Parameters:    device -> the device to write to
+                entry = driver entry to call
+                flags = transfer flags
                 block -> transfer block
  Returns:       pointer to an error block if failed
                 NULL if successful
  ******************************************************************/
-_kernel_oserror * device_read(device_t *device, unsigned long flags, transfer_block_t *block)
-{
-    _kernel_oserror *err;
-    err = device_check_transfer(device, block);
-    if (err)
-        return err;
-
-    return _callx(device->driver_code, device->driver_ws,
-                 _INR(0, 3),
-                 BlockDeviceOp_Read, device->device_id, flags, block);
-}
-
-
-/*******************************************************************
- Function:      device_write
- Description:   Write data to a device.
- Parameters:    device -> the device to write to
-                flags = read flags
-                block -> transfer block
- Returns:       pointer to an error block if failed
-                NULL if successful
- ******************************************************************/
-_kernel_oserror * device_write(device_t *device, unsigned long flags, transfer_block_t *block)
-{
-    _kernel_oserror *err;
-    if (device->info.device_flags & DeviceFlag_ReadOnly)
-        return err_ReadOnly;
-
-    err = device_check_transfer(device, block);
-    if (err)
-        return err;
-
-    return _callx(device->driver_code, device->driver_ws,
-                 _INR(0, 3),
-                 BlockDeviceOp_Write, device->device_id, flags, block);
-}
-
-
-/*******************************************************************
- Function:      device_verify
- Description:   Verify data on a device.
- Parameters:    device -> the device to write to
-                flags = read flags
-                block -> transfer block (address ignored)
- Returns:       pointer to an error block if failed
-                NULL if successful
- ******************************************************************/
-_kernel_oserror * device_verify(device_t *device, unsigned long flags, transfer_block_t *block)
+_kernel_oserror * device_transfer(device_t *device, unsigned int entry, unsigned long flags, transfer_block_t *block)
 {
     _kernel_oserror *err;
 
@@ -254,40 +212,30 @@ _kernel_oserror * device_verify(device_t *device, unsigned long flags, transfer_
         return err;
 
     return _callx(device->driver_code, device->driver_ws,
-                 _INR(0, 3),
-                 0, device->device_id, flags, block);
+                  _INR(0, 2) | _INR(8, 9),
+                  device->device_id, flags, block,
+                  entry, device->driver_ref);
 }
 
 
 /*******************************************************************
  Function:      device_miscop
  Description:   Perform miscellaneous operations on the device
- Parameters:    device -> the device to write to
-                op = operation to perform
-                r-> registers for operation
+ Parameters:    device -> the device
+                entry = driver entry to call
+                r -> registers for operation
  Returns:       pointer to an error block if failed
                 NULL if successful
  ******************************************************************/
-_kernel_oserror * device_miscop(device_t *device, unsigned long op, _kernel_swi_regs *r)
+_kernel_oserror * device_miscop(device_t *device, unsigned int entry, _kernel_swi_regs *r)
 {
+    // printf("device_miscop %d. dev id=%d r0=%d\n", entry, device->device_id, r->r[0]);
     return _callx(device->driver_code, device->driver_ws,
-                 _INR(0, 3),
-                 BlockDeviceOp_MiscOp, device->device_id, op, r);
-}
-
-
-/*******************************************************************
- Function:      device_driverop
- Description:   Perform driver operations on the device
- Parameters:    device -> the device to write to
-                op = operation to perform
-                r-> registers for operation
- Returns:       pointer to an error block if failed
-                NULL if successful
- ******************************************************************/
-_kernel_oserror * device_driverop(device_t *device, unsigned long op, _kernel_swi_regs *r)
-{
-    return _callx(device->driver_code, device->driver_ws,
-                 _INR(0, 3),
-                 BlockDeviceOp_DriverOp, device->device_id, op, r);
+                  _INR(0, 9) | _OUTR(0, 7),
+                  r->r[0], r->r[1], r->r[2], r->r[3],
+                  r->r[4], r->r[5], r->r[6], r->r[7],
+                  entry, device->driver_ref,
+                  &r->r[0], &r->r[1], &r->r[2], &r->r[3],
+                  &r->r[4], &r->r[5], &r->r[6], &r->r[7]
+                  );
 }

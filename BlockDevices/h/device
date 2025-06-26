@@ -16,6 +16,7 @@ typedef struct device_s {
     device_info_t     info;
     void *            driver_code;
     void *            driver_ws;
+    void *            driver_ref;
 } device_t;
 
 
@@ -32,7 +33,8 @@ typedef struct device_s {
 device_t *device_create(
               device_info_t * info,
               void *          driver_code,
-              void *          driver_ws);
+              void *          driver_ws,
+              void *          driver_ref);
 
 /*******************************************************************
  Function:      device_destroy
@@ -44,58 +46,27 @@ device_t *device_create(
 void device_destroy(device_t *device);
 
 /*******************************************************************
- Function:      device_read
- Description:   Read data from a device.
+ Function:      device_transfer
+ Description:   Perform a transfer to or from the device.
  Parameters:    device -> the device to read from
+                entry = entry to call
                 flags = read flags
                 block -> transfer block
  Returns:       pointer to an error block if failed
                 NULL if successful
  ******************************************************************/
-_kernel_oserror *device_read(device_t *device, unsigned long flags, transfer_block_t *block);
-
-/*******************************************************************
- Function:      device_write
- Description:   Write data to a device.
- Parameters:    device -> the device to write to
-                flags = write flags
-                block -> transfer block
- Returns:       pointer to an error block if failed
-                NULL if successful
- ******************************************************************/
-_kernel_oserror *device_write(device_t *device, unsigned long flags, transfer_block_t *block);
-
-/*******************************************************************
- Function:      device_verify
- Description:   Verify blocks on the device
- Parameters:    device -> the device to write to
-                flags = verify flags
-                block -> transfer block (address ignored)
- Returns:       pointer to an error block if failed
-                NULL if successful
- ******************************************************************/
-_kernel_oserror *device_verify(device_t *device, unsigned long flags, transfer_block_t *block);
+_kernel_oserror *device_transfer(device_t *device, unsigned int entry, unsigned long flags, transfer_block_t *block);
 
 /*******************************************************************
  Function:      device_miscop
  Description:   Perform miscellaneous operations on the device
- Parameters:    device -> the device to write to
-                op = operation to perform
+ Parameters:    device -> the device to operatat on
+                entry = the entry to call
                 r-> registers for operation
  Returns:       pointer to an error block if failed
                 NULL if successful
  ******************************************************************/
-_kernel_oserror * device_miscop(device_t *device, unsigned long op, _kernel_swi_regs *r);
+_kernel_oserror *device_miscop(device_t *device, unsigned int entry, _kernel_swi_regs *r);
 
-/*******************************************************************
- Function:      device_driverop
- Description:   Perform deriver operations on the device
- Parameters:    device -> the device to write to
-                op = operation to perform
-                r-> registers for operation
- Returns:       pointer to an error block if failed
-                NULL if successful
- ******************************************************************/
-_kernel_oserror * device_driverop(device_t *device, unsigned long op, _kernel_swi_regs *r);
 
 #endif

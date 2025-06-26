@@ -12,13 +12,8 @@
 
 #include "swis.h"
 
-static struct {
-    int next_id;
-    device_t* devices;
-    device_t** tailp;
-} devices;
-
-
+int next_id;
+device_t* devices;
 
 /*******************************************************************
  Function:      devices_notify_announce
@@ -43,9 +38,8 @@ static void device_notify_announce(device_t *device, int started)
  ******************************************************************/
 int devices_init(void)
 {
-    devices.next_id = 1;
-    devices.devices = NULL;
-    devices.tailp = &devices.devices;
+    next_id = 1;
+    devices = NULL;
 
     return 0;
 }
@@ -58,9 +52,7 @@ int devices_init(void)
  ******************************************************************/
 int devices_final(void)
 {
-    device_t *device = devices.devices;
-    devices.devices = NULL;
-    devices.tailp = &devices.devices;
+    device_t *device = devices;
 
     while (device)
     {
@@ -81,14 +73,24 @@ int devices_final(void)
  ******************************************************************/
 int devices_register(device_t *device)
 {
-    device->device_id = devices.next_id++;
-    /* FIXME: If we've wrapped, this is not sufficient; we need to find a gap - this case is unlikely
-     *        so I don't care for now.
+    device->device_id = next_id++;
+    /* FIXME: If we've wrapped, this is not sufficient; we need to find a gap.
+     *        this case is unlikely so I don't care for now.
      */
     device->next = NULL;
 
-    /* Attach to the end of the devices list */
-    *devices.tailp = device;
+    if (devices == 0)
+    {
+        /* It's the first device */
+        devices = device;
+    }
+    else
+    {
+        /* Attach to the end of the devices list */
+        device_t* last = devices;
+        while (last->next != 0) last = last->next;
+        last->next = device;
+    }
 
     /* Issue service that we have a new device */
     device_notify_announce(device, 1);
@@ -104,12 +106,12 @@ int devices_register(device_t *device)
  ******************************************************************/
 int devices_deregister(int device_id)
 {
-    device_t *cur = devices.devices;
-    device_t **lastp = &devices.devices;
+    device_t *cur = devices;
+    device_t *last = 0;
 
     while (cur && cur->device_id != device_id)
     {
-        lastp = &cur->next;
+        last = cur;
         cur = cur->next;
     }
     if (cur == NULL)
@@ -118,13 +120,15 @@ int devices_deregister(int device_id)
         return 1;
     }
 
-    /* We found the device in our list; remove it */
-    if (&cur->next == devices.tailp)
-    {
-        /* This was the last entry on the list; so move the tail pointer */
-        devices.tailp = lastp;
+    if (last == 0) {
+        /* We were the first item */
+        devices = cur->next;
     }
-    *lastp = cur->next; /* unlinks from the list */
+    else
+    {
+        /* Remove from the list */
+        last->next = cur->next;
+    }
 
     /* Issue service that we have removed a device */
     device_notify_announce(cur, 0);
@@ -134,34 +138,37 @@ int devices_deregister(int device_id)
     return 0;
 }
 
+
 /*******************************************************************
  Function:      devices_rescan
- Description:   Rescans a device
- Parameters:    device-> the device that we're rescanning
+ Description:   Announce the device as being removed and then returning
+                to cause anything downstream to update itself.
+ Parameters:    device_id = the device id to rescan, 0 for all
  Returns:       0 if successful; 1 if failed
  ******************************************************************/
 int devices_rescan(int device_id)
 {
-    device_t *cur = devices.devices;
-    device_t **lastp = &devices.devices;
+    device_t *device = devices;
+    int rv = 1;
 
-    while (cur && cur->device_id != device_id)
-    {
-        lastp = &cur->next;
-        cur = cur->next;
-    }
-    if (cur == NULL)
-    {
-        /* We reached the end of the list without finding the device - failed */
-        return 1;
+    while (device) {
+      if (device->device_id == device_id) {
+        device_notify_announce(device, 0);
+        device_notify_announce(device, 1);
+        rv = 0;
+      }
+      device = device->next;
     }
 
-    /* Issue service that we have removed a device */
-    device_notify_announce(cur, 0);
-    device_notify_announce(cur, 1);
+    if (rv == 1 && device_id != 0)
+    {
+      /* Device was specified, but we didn't find it */
+      return 1;
+    }
 
     return 0;
 }
+
 
 /*******************************************************************
  Function:      devices_finddevice
@@ -174,7 +181,7 @@ device_t *devices_find(int device_id)
 {
     device_t *cur;
 
-    for (cur=devices.devices;
+    for (cur=devices;
          cur && cur->device_id != device_id;
          cur=cur->next)
         ; /* Search is in the for loop */
@@ -195,7 +202,7 @@ device_t *devices_after(device_t *device)
     unsigned long device_id = device ? device->device_id : 0;
     device_t *cur;
 
-    for (cur=devices.devices;
+    for (cur=devices;
          cur;
          cur=cur->next)
     {
