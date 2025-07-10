@@ -46,9 +46,6 @@ device_t *device_create(
     device->info.interface_type   = info->interface_type;
     device->info.media_type       = info->media_type;
     device->info.parent_device    = info->parent_device;
-    device->info.partition_scheme = info->partition_scheme;
-    device->info.partition_index  = info->partition_index;
-    device->info.partition_type   = info->partition_type;
     device->info.block_count      = info->block_count;
     device->info.block_size       = info->block_size;
 

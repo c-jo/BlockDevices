@@ -69,7 +69,7 @@ static char *unit_names[] = { "B", "KB", "MB", "GB", "TB" };
 static void format_capacity(UINT64 block_count, unsigned block_size, char *buffer)
 {
     unsigned long count, units = 0;
-    float value;
+    double value;
     LL_L2UI(count, block_count);
     value = count;
     value = value * block_size;
@@ -142,3 +142,20 @@ _kernel_oserror *Cmd_BlockDevices(void)
     }
     return NULL;
 }
+
+
+/*******************************************************************
+ Function:      Cmd_BlockDeviceInfo
+ Description:   Display information about a device.
+ Parameters:
+ Returns:       pointer to an error block if failed
+                NULL if successful
+ ******************************************************************/
+_kernel_oserror *Cmd_BlockDeviceInfo(const char *arg_string, int argc)
+{
+
+    device_t *device=devices_find(atoi(arg_string));
+
+    return NULL;
+}
+
