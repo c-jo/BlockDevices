@@ -64,13 +64,6 @@ typedef enum media_type_e {
     BlockDevice_MediaType_BD = 7
 } media_type_type_t;
 
-// Partition schemes
-typedef enum partition_scheme_e {
-    BlockDevice_PartitionScheme_None = 0,
-    BlockDevice_PartitionScheme_MBR = 1,
-    BlockDevice_PartitionScheme_GPT = 2
-} partition_scheme_t;
-
 // Block device info block
 typedef struct device_info_s {
     unsigned    device_flags;
@@ -79,10 +72,6 @@ typedef struct device_info_s {
     unsigned    media_type:8;
     unsigned    unused_1:8;
     unsigned    parent_device;
-    unsigned    partition_scheme:8;
-    unsigned    partition_index:16;
-    unsigned    unused_2:8;
-    void *      partition_type;
     blockaddr_t block_count;
     unsigned    block_size;
     char *      description;
@@ -136,9 +125,10 @@ typedef struct smart_attribute_header_s {
 #define SMART_Attribute_Header_Status_Critical 0x02
 #define SMART_Attribute_Header_Status_Failure  0x03
 
-#define SMART_Attribute_Header_Flags_Higher_Is_Better  1
-#define SMART_Attribute_Header_Flags_Threshold_Present 2
-#define SMART_Attribute_Header_Flags_Critical_Present  4
+#define SMART_Attribute_Header_Flags_Threshold_Present 1
+#define SMART_Attribute_Header_Flags_Critical_Present  2
+#define SMART_Attribute_Header_Flags_Higher_Is_Better  4 // Setting both
+#define SMART_Attribute_Header_Flags_Lower_Is_Better   8 // is undefined.
 
 #define SMART_Attribute_Header_Attribute_Type_General 0x00
 #define SMART_Attribute_Header_Attribute_Type_IDE     0x01
@@ -149,10 +139,15 @@ typedef struct smart_attribute_header_s {
 #define BlockDeviceOp_DeviceOp_ModelName    0x4c444f4d // MODL
 #define BlockDeviceOp_DeviceOp_Firmware     0x45525746 // FWRE
 
+#define BlockDeviceOp_DeviceOp_PartitionInfo 0x54524150 // PART
+#define BlockDeviceOp_DeviceOp_Partion_MBR   0x2e52424d // MBR.
+#define BlockDeviceOp_DeviceOp_Partion_GPT   0x2e545047 // GPT.
+
 #define BlockDeviceOp_SectorOp_TRIM  0x4D495254 // TRIM
 
 #define BlockDeviceOp_MediaOp_BlockSizes   0x5a534b42 // BKSZ
 #define BlockDeviceOp_MediaOp_SetBlockSize 0x5a534253 // SBSZ
+
 #endif
 
 // Service calls
@@ -182,8 +177,9 @@ typedef struct smart_attribute_header_s {
 #define BlockDevice_DriverOp 0x5A6C8
 #define BlockDevice_Register 0x5A6D0
 #define BlockDevice_Deregister 0x5A6D1
-#define BlockDevice_Enumerate 0x5A6D2
-#define BlockDevice_Rescan 0x5A6D3
+#define BlockDevice_Rescan 0x5A6D2
+#define BlockDevice_Enumerate 0x5A6D3
+#define BlockDevice_EnumerateChildren 0x5A6D4
 #endif
 
 #endif

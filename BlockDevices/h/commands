@@ -19,4 +19,13 @@
  ******************************************************************/
 _kernel_oserror *Cmd_BlockDevices(void);
 
+/*******************************************************************
+ Function:      Cmd_BlockDeviceInfo
+ Description:   Display information about a block device
+ Parameters:    none
+ Returns:       pointer to an error block if failed
+                NULL if successful
+ ******************************************************************/
+_kernel_oserror *Cmd_BlockDeviceInfo(const char *arg_string, int argc);
+
 #endif

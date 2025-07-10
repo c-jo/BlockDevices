@@ -1,10 +1,11 @@
 Device information block
+------------------------
 
 +0  device_flags:
         b0:     Device is read only
         b1:     Device supports eject
         b31:    Device is being debugged
-        b1-31:  Must be 0
+        b2-30:  Must be 0
 +4  Interface and media type
         b0-7:  Interface type
                     0 = Unknown
@@ -32,26 +33,25 @@ Device information block
                     4 = SSD
                     5 = RAM
                     other: not currently defined
-        b24-31:  Reserved
-+8  parent_device id, or 0 if none
-+16 parent partition details:
-        b0-7:   Partition scheme:
-                    0 = None
-                    1 = MBR
-                    2 = GPT
-                    other: not currently defined
-        b8-23:  Partition index
-+20 partition type (using the partition scheme)
-+24 number of blocks on device (64 bit)
-+32 size of blocks (in bytes)
-+36 pointer to 0-terminated string describing device name (or zero for none)
-+40 pointer to 0-terminated string describing manufacturer (or zero for none)
-+44 pointer to 0-terminated string describing product (or zero for none)
-+48 pointer to 0-terminated string describing serial number (or zero for none)
-+52 pointer to 0-terminated string describing firmware version (or zero for none)
+        b24-31: Reserved
++8  Parent_device id, or 0 if none
++12 Number of blocks on device (64-bit)
++20 Block size (in bytes)
++24 Pointer to 0-terminated string describing device
 
+Transfer Block
+--------------
++0  Block address (64-bit)
++8  Memory address
++12 Number of blocks to transfer
 
 SWI API
+
+SWI BlockDevices_Info
+=>  R0 = device id
+<=  R1 = device information block
+
+Returns the device information block for the given device id.
 
 SWI BlockDevices_Enumerate
 =>  R0 = last device id, or 0 to start enumeration
@@ -61,27 +61,26 @@ SWI BlockDevices_Enumerate
 
 Enumerates the currently registered devices.
 
+SWI BlockDevices_EnumerateChildren
+=>  R0 = last device id, or 0 to start enumeration
+    R2 = parent device
+<=  R0 = 0 if no more devices
+         or device id of this device
+    R1 = device information block
 
-SWI BlockDevices_Info
-=>  R0 = device id
-<=  R1 = device information block
-
-Returns the device information block for the given device id.
+Enumerates the currently registered devices with the given parent.
 
 
 SWI BlockDevices_Read
 =>  R0 = device id to read to
     R1 = flags for the read operation (currenrly unused)
-    R2 = transfer block:
-            +0  64bit LBA to read
-            +4  pointer to memory to read into
-            +8  number of bytes to read
-
+    R2 = transfer block
 
 Reads data from the block device.
-On return from the read operation, the transfer block should return the block updated
-with a new LBA, pointer to memory and number of bytes, even if the transfer failed. This is
-to allow the caller to retry using the same block.
+
+On return from the read operation, the transfer block should return the block
+updated with a new LBA, pointer to memory and number of bytes, even if the
+transfer failed. This is to allow the caller to retry using the same block.
 
 Errors:
     BadDevice: returned when the device id supplied is not valid.
@@ -90,8 +89,7 @@ Errors:
 SWI BlockDevices_Write
 =>  R0 = device id to write to
     R1 = flags for the write operation (currently unused)
-    R2 = transfer block:
-            <as for BlockDevices_Read>
+    R2 = transfer block
 
 Writes data to the block device.
 
@@ -108,60 +106,17 @@ SWI BlockDevices_Verify
 Performs a verify of the specified blocks. The address is unused.
 
 
-SWI BlockDevices_MiscOp
-=>  R0 = device id to operate on
-    R1 = operation type:
-            b28-31:     domain:
-                            0   Device - operations that address the device itself
-                            1   Media - operations that address the media storing data
-                            2   Security - operations that control the security of data
-                            3   Sector - operations that affect sector data
-            b27         status/health request
-            b23-26      data type in R1/R2:
-                            0   opaque
-                            1   read string data in R2, length in R3
-                            2   64bit value (low in R2, high in R3)
-                            3   read data in R2, length in R3
-                            4   R2 contains a reference to a block
-                            5   R2 contains a reference to a block and block count
-                            6   R2 contains a reference to a list of blocks
-                            7   R2 contains a reference to a list of blocks and counts
-            b16-22      reserved, must be 0
-            b0-15:      dependant on the domain
-    R2-R9 dependant on operation type
+SWI BlockDevices_DeviceOp
+SWI BlockDevices_MediaOp
+SWI BlockDevices_SecurityOp
+SWI BlockDevices_SectorOp
 
-Performs miscellaneous operations on the block device.
-The operation code is structured such that operations can be decoded by the BlockDevices
-when debug is enabled, and to ensure that there is some consistency between the
-interfaces used.
+=>  R0 = Device id to operate on
+    R1 = Operation
+    other registers dependant on operation
+<=  registers dependant on operation
 
-Errors:
-    ReadOnly: Reported when the device is not writeable.
-
-
-SWI BlockDevices_MiscOp &0 (PowerEject)
-=>  R0 = device id to operate on
-    R1 = 0 (device operation power eject)
-
-Requests that the block device performs an eject operation on the media.
-By necessity, the block device driver should also deregister the block device,
-as it will no longer be accessible.
-
-Errors:
-    BadMiscOp: Reported if this operation is not supported.
-
-
-SWI BlockDevices_MiscOp &1 (Identify)
-=>  R0 = device id to operate on
-    R1 = 1 (device operation: identify)
-    R2 = 1 to enable identifying light or similar
-         0 to disable identifying light
-
-Requests that the device show a light to indicate which physical device is
-being controlled.
-
-Errors:
-    BadMiscOp: Reported if this operation is not supported.
+Performs miscellaneous operations on the device, media, security or sector.
 
 
 SWI BlockDevices_DriverOp
@@ -182,20 +137,23 @@ SWI BlockDevices_Register
 
 Register a block device driver.
 
-On registration the device name may be given one of 4 ways:
-
-* 0 or an empty string, to use a simple incrementing value.
-  This should only be used for prototype devices.
-* A fully specified path, starting with a `/` character.
-* A device name, with parent device supplied. In this form,
-  the device name will be appended to the path of the parent
-  device.
-* A device name, without a parent device supplied. In this
-  form, the device name will have a `/` character prepended.
-
 Errors:
     RegisterFailed: Reported when the device is not recognised.
     RegisterFailedFlags: Reported when the flags supplied are not recognised.
+
+Entrypoint:
+
+=>  R0 = Operation code:
+            1 => Read data
+            2 => Write data
+            3 => Verify
+            4 => DeviceOp
+            5 => MediaOp
+            6 => SecurityOp
+            7 => SectorOp
+            8 => DriverOp
+
+    R1..R9 = parameters dependant on the entry point
 
 
 SWI BlockDevices_Deregister
@@ -204,13 +162,24 @@ SWI BlockDevices_Deregister
 
 Deregister a block device driver.
 
+SWI BlockDevices_Rescan
 
-Entrypoint:
+=> R0 = Device id, or 0 for all
 
-=>  R0 = Operation code:
-            1 => Read data
-            2 => Write data
-            3 => verify
-            4 => MiscOp
-            8 => DriverOp
-    R1..R9 = parameters dependant on the entry point
+Remove and re-add the given device (or all devices) to cause other modules to
+rescan them. For exmple a parttion editor will call this on the device to cause
+anyhing that has read the partition table to re-read it.
+
+
+Service Calls
+=============
+
+Service_BlockDevices_Started (0x81200)
+Service_BlockDevices_Dying (0x81201)
+
+The block devices system is starting or dying.
+
+Service_BlockDevices_DeviceAdded (0x81202)
+Service_BlockDevices_DeviceRemoved (0x81203)
+
+The device in R0 has been added or removed.

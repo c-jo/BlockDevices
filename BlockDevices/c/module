@@ -131,9 +131,9 @@ _kernel_oserror *Mod_Command(const char *arg_string, int argc, int number,
 
     if (number == CMD_BlockDevices)
         return Cmd_BlockDevices();
-    /*if (number == CMD_BlockDeviceInfo)
+    if (number == CMD_BlockDeviceInfo)
         return Cmd_BlockDeviceInfo(arg_string, argc);
-    */
+
     return NULL;
 }
 
@@ -153,6 +153,40 @@ _kernel_oserror *Mod_Command(const char *arg_string, int argc, int number,
 _kernel_oserror *SWI_Enumerate(int number, _kernel_swi_regs *r, void *pw)
 {
     device_t *device = devices_after(devices_find(r->r[0]));
+
+    if (device == NULL)
+    {
+        r->r[0] = 0;
+    }
+    else
+    {
+        r->r[0] = (int)device->device_id;
+        r->r[1] = (int)&device->info;
+    }
+    return NULL;
+}
+
+
+/*******************************************************************
+ Function:      SWI_EnumerateChildren
+ Description:   Enumerate the children for a given device
+ Parameters:    number = SWI number
+                r -> registers block on entry for update
+                    =>  R0  = first call value, or 0 to start
+                    =>  R1  = parent device (0 for top-level)
+                    <=  R0  = 0 for no more, or device id
+                        R2 -> device info
+                pw -> module private word
+ Returns:       pointer to an error block if failed
+                NULL if successful
+ ******************************************************************/
+_kernel_oserror *SWI_EnumerateChildren(int number, _kernel_swi_regs *r, void *pw)
+{
+    device_t *device;
+
+    do {
+      device = devices_after(devices_find(r->r[0]));
+    } while (device && device->info.parent_device != r->r[1]);
 
     if (device == NULL)
     {

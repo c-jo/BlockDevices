@@ -96,8 +96,9 @@ swi-decoding-table: BlockDevice \
  15 \
  Register/SWI_Register \
  Deregister/SWI_Deregister \
+ Rescan/SWI_Rescan \
  Enumerate/SWI_Enumerate \
- Rescan/SWI_Rescan
+ EnumerateChildren/SWI_EnumerateChildren
 
 ; Generic veneers are used to provide a simple C environment for SVC and IRQ
 ; modes. You should register the Entry routine as the external interface (ie
