@@ -182,10 +182,10 @@ _kernel_oserror *SWI_Enumerate(int number, _kernel_swi_regs *r, void *pw)
  ******************************************************************/
 _kernel_oserror *SWI_EnumerateChildren(int number, _kernel_swi_regs *r, void *pw)
 {
-    device_t *device;
+    device_t *device = devices_find(r->r[0]);
 
     do {
-      device = devices_after(devices_find(r->r[0]));
+      device = devices_after(device);
     } while (device && device->info.parent_device != r->r[1]);
 
     if (device == NULL)
