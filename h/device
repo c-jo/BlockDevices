@@ -17,6 +17,7 @@ typedef struct device_s {
     void *            driver_code;
     void *            driver_ws;
     void *            driver_ref;
+    char *            devicefs_name;
 } device_t;
 
 
@@ -39,8 +40,8 @@ device_t *device_create(
 /*******************************************************************
  Function:      device_destroy
  Description:   Destroy the device
- Parameters:    device-> the device we're destroying (assumed to already have
-                      been unlinked).
+ Parameters:    device-> the device we're destroying
+                         (assumed to already have been unlinked).
  Returns:       none
  ******************************************************************/
 void device_destroy(device_t *device);

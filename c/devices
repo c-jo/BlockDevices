@@ -8,10 +8,11 @@
 #include "kernel.h"
 
 #include "devices.h"
-#include "modhead.h"
 #include <stdio.h>
 
 #include "swis.h"
+
+#include "BlockDevicesHdr.h"
 
 device_t* devices = 0;
 

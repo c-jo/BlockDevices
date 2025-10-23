@@ -2,6 +2,7 @@
 
 #include "VersionNum"
 #include "BlockDevices.h"
+#include "Global/Services.h"
 
 ; You should give your module a sensible name which describes its purpose
 ; both accurately and concisely.
@@ -50,7 +51,8 @@ error-identifiers: \
  err_RegisterFailedFlags("Device registration failed (flags not supported)") \
  err_ReadOnly("Device cannot be written to (device is read only)") \
  err_TransferOutsideDevice("Block transfer is beyond device end") \
- err_BadMiscOp("BlockDevice does not support MiscOp operation")
+ err_BadMiscOp("BlockDevice does not support MiscOp operation") \
+ err_BadParameter("Bad parameter")
 
 ; When the module is initialised, this routine will be entered. You should
 ; be very careful to initialise your module safely. If anything fails, you
@@ -175,8 +177,8 @@ add-syntax:)
 ; The module service entry will be called to process services. You are
 ; strongly recommended to include the numbers of the services you wish to
 ; handle.
-;service-call-handler: Mod_Service \
-; Service_BlockDevices_Started \
+service-call-handler: Mod_Service \
+  Service_ShutDownComplete
 ; Service_BlockDevices_Dying \
 ; Service_BlockDevices_DeviceAdded \
 ; Service_BlockDevices_DeviceRemoved

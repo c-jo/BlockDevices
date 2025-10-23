@@ -8,9 +8,10 @@
 #include <string.h>
 
 #include "callx.h"
+#ifdef FORTIFY
 #include "fortify.h"
-
-#include "modhead.h"
+#endif
+#include "BlockDevicesHdr.h"
 #include "BlockDevices.h"
 #include "device.h"
 #include "devices.h"
@@ -42,12 +43,13 @@ device_t *device_create(
         goto failed;
 
     /* Copy the fields to our device information block */
-    device->info.device_flags     = info->device_flags;
-    device->info.interface_type   = info->interface_type;
-    device->info.media_type       = info->media_type;
-    device->info.parent_device    = info->parent_device;
-    device->info.block_count      = info->block_count;
-    device->info.block_size       = info->block_size;
+    device->info.flags          = info->flags;
+    device->info.interface_type = info->interface_type;
+    device->info.interface_connection = info->interface_connection;
+    device->info.media_type     = info->media_type;
+    device->info.parent_device  = info->parent_device;
+    device->info.block_count    = info->block_count;
+    device->info.block_size     = info->block_size;
 
   #if 0
     /* Allocations for the name are slightly harder.
@@ -116,11 +118,12 @@ device_t *device_create(
 //    STRDUP_OR_FAIL(device->info.product, info->product);
 //    STRDUP_OR_FAIL(device->info.serial, info->serial);
 //    STRDUP_OR_FAIL(device->info.firmware, info->firmware);
+    STRDUP_OR_FAIL(device->info.name,        info->name       );
     STRDUP_OR_FAIL(device->info.description, info->description);
 
     device->driver_code = driver_code;
-    device->driver_ws = driver_ws;
-    device->driver_ref = driver_ref;
+    device->driver_ws   = driver_ws;
+    device->driver_ref  = driver_ref;
 
     return device;
 
@@ -147,6 +150,7 @@ failed:
  ******************************************************************/
 _kernel_oserror *device_check_transfer(device_t *device, transfer_block_t *transfer)
 {
+ #ifdef USE_LONG_LONG
     blockaddr_t transfer_end;
     int blocks_count;
     blockaddr_t blocks_count_ll;
@@ -156,6 +160,11 @@ _kernel_oserror *device_check_transfer(device_t *device, transfer_block_t *trans
     LL_UI2L(blocks_count_ll, blocks_count);
     LL_ADD(transfer_end, transfer->lba, blocks_count_ll);
     if (LL_UCMP(transfer_end, >, device->info.block_count))
+#else
+    blockaddr_t transfer_end = transfer->lba + transfer->count;
+
+    if (transfer_end > device->info.block_count)
+#endif
     {
         return err_TransferOutsideDevice;
     }
@@ -174,7 +183,6 @@ void device_destroy(device_t *device)
 {
     if (device)
     {
-//        free(device->info.name);
 //        device->info.manufacturer = NULL;
 //        free(device->info.manufacturer);
 //        device->info.manufacturer = NULL;
@@ -184,6 +192,7 @@ void device_destroy(device_t *device)
 //        device->info.serial = NULL;
 //        free(device->info.firmware);
 //        device->info.firmware = NULL;
+        free(device->info.name);
         free(device->info.description);
         free(device);
     }

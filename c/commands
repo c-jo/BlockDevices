@@ -10,7 +10,7 @@
 #include "kernel.h"
 #include "swis.h"
 
-#include "modhead.h"
+#include "BlockDevicesHdr.h"
 #include "commands.h"
 #include "devices.h"
 
@@ -44,24 +44,22 @@ static idmessages_t interface_connection_names[] = {
     { IDMESSAGE_LAST }
 };
 
-
 static idmessages_t media_type_names[] = {
     { BlockDevice_MediaType_Unknown, "-" },
     { BlockDevice_MediaType_Floppy, "Floppy" },
-    { BlockDevice_MediaType_HDD, "HDD" },
+    { BlockDevice_MediaType_HardDisc, "HardDisc" },
     { BlockDevice_MediaType_SSD, "SSD" },
     { BlockDevice_MediaType_RAM, "RAM" },
     { BlockDevice_MediaType_CD, "CD" },
     { BlockDevice_MediaType_DVD, "DVD" },
-    { BlockDevice_MediaType_BD, "BD" },
+    { BlockDevice_MediaType_BluRay, "BD" },
     { IDMESSAGE_LAST }
 };
 
-
 static idmessages_t partition_scheme_names[] = {
-    { BlockDevice_PartitionScheme_MBR, "MBR" },
-    { BlockDevice_PartitionScheme_GPT, "GPT" },
-    { BlockDevice_PartitionScheme_FileCore, "FileCore" },
+    { BlockDevice_PartitionType_MBR, "MBR" },
+    { BlockDevice_PartitionType_GPT, "GPT" },
+//    { BlockDevices_PartitionType_FileCore, "FileCore" },
     { IDMESSAGE_LAST }
 };
 
@@ -79,8 +77,8 @@ static void format_capacity(UINT64 block_count, unsigned block_size, char *buffe
 {
     unsigned long count, units = 0;
     double value;
-    LL_L2UI(count, block_count);
-    value = count;
+//    LL_L2UI(count, block_count);
+    value = block_count;
     value = value * block_size;
 
     while (value > 9999 && units < 5) {
@@ -110,9 +108,76 @@ const char *lookup(int num, idmessages_t *msgs)
         }
         msgs++;
     }
-    return "";
+    return "Unknown";
 }
 
+/*******************************************************************
+ Function:      find_max_device_depth
+ Description:   Find the maximum depth of devices in the tree
+ Parameters:    device = device to check (or NULL for root level)
+                current_depth = current depth level
+ Returns:       Maximum depth found
+ ******************************************************************/
+static int find_max_device_depth(device_t *device, int current_depth)
+{
+    int max_depth = current_depth;
+    device_t *child = NULL;
+    unsigned parent_id = (device == NULL) ? 0 : device->device_id;
+
+    // Find all children of this device (or root devices if device is NULL)
+    for (child = 0; (child = devices_after(child)) != NULL; )
+    {
+        if (child->info.parent_device == parent_id)
+        {
+            int child_depth = find_max_device_depth(child, current_depth + 1);
+            if (child_depth > max_depth)
+                max_depth = child_depth;
+        }
+    }
+
+    return max_depth;
+}
+
+/*******************************************************************
+ Function:      display_device_and_children
+ Description:   Display a device and its children recursively
+ Parameters:    device = device to display
+                indent = indentation level (number of spaces)
+ Returns:       None
+ ******************************************************************/
+static void display_device_and_children(device_t *device, int indent)
+{
+    char capacity[16];
+    char indent_str[64];
+    int i;
+
+    // Create indentation string
+    for (i = 0; i < indent && i < 63; i++)
+        indent_str[i] = ' ';
+    indent_str[i] = '\0';
+
+    format_capacity(device->info.block_count, device->info.block_size, capacity);
+
+    printf("%s%-4i %s %-24s %-8s %-5s %-5s\n",
+           indent_str,
+           (int)device->device_id,
+           device->info.name,
+           device->info.description,
+           capacity,
+           lookup(device->info.interface_type, interface_type_names),
+           lookup(device->info.media_type, media_type_names)
+           );
+
+    // Display children
+    device_t *child = NULL;
+    for (child = 0; (child = devices_after(child)) != NULL; )
+    {
+        if (child->info.parent_device == device->device_id)
+        {
+            display_device_and_children(child, indent + 2);
+        }
+    }
+}
 
 /*******************************************************************
  Function:      Cmd_BlockDevices
@@ -123,33 +188,27 @@ const char *lookup(int num, idmessages_t *msgs)
  ******************************************************************/
 _kernel_oserror *Cmd_BlockDevices(void)
 {
-  device_t *device = NULL;
+    device_t *device = NULL;
+    int max_depth = find_max_device_depth(NULL, 0);
+    int header_padding = max_depth * 2; // 2 spaces per level
+    char padding_str[64];
+    int i;
 
-    printf("%-4s %-24s %-8s %-5s %-5s\n",
-           "Dev.", "Description", "Capacity", "IFace", "Media");
+    // Create padding string for header
+    for (i = 0; i < header_padding && i < 63; i++)
+        padding_str[i] = ' ';
+    padding_str[i] = '\0';
 
+    printf("%-4s%s %-24s %-8s %-5s %-5s\n",
+           "Dev.", padding_str, "Description", "Capacity", "IFace", "Media");
 
+    // Display root devices (parent_device = 0) and their children
     for (device = 0; (device=devices_after(device)) != NULL; )
     {
-        char capacity[6];
-
-        format_capacity(device->info.block_count, device->info.block_size, capacity);
-
-        printf("%-4i %-24s %-8s %-5s %-5s\n",
-               (int)device->device_id,
-               device->info.description,
-               capacity,
-               lookup(device->info.interface_type, interface_type_names),
-               lookup(device->info.media_type, media_type_names)
-               );
-/*
-        printf("%5s   %-24s  %-32s  %-9s  %s\n",
-               "",
-               device->info.manufacturer ? device->info.manufacturer : "",
-               device->info.product      ? device->info.product      : "",
-               device->info.serial       ? device->info.serial       : "",
-               device->info.firmware     ? device->info.firmware     : "");
-*/
+        if (device->info.parent_device == 0)
+        {
+            display_device_and_children(device, 0);
+        }
     }
     return NULL;
 }
@@ -157,13 +216,44 @@ _kernel_oserror *Cmd_BlockDevices(void)
 /*******************************************************************
  Function:      Cmd_BlockDeviceInfo
  Description:   Display information about a device.
- Parameters:    
+ Parameters:
  Returns:       pointer to an error block if failed
                 NULL if successful
  ******************************************************************/
 _kernel_oserror *Cmd_BlockDeviceInfo(const char *arg_string, int argc)
 {
     device_t *device=devices_find(atoi(arg_string));
+
+    if (device == NULL)
+    {
+        return err_BadDevice;
+    }
+
+    char capacity[16];
+    format_capacity(device->info.block_count, device->info.block_size, capacity);
+
+    printf("Device %d information:\n", (int)device->device_id);
+    printf("  Description: %s\n", device->info.description ? device->info.description : "Unknown");
+    printf("  Size:        %llu blocks of %d bytes (%s)\n",
+        (unsigned long long)device->info.block_count,
+        device->info.block_size,
+        capacity);
+    printf("  Interface:   %s (%s)\n",
+        lookup(device->info.interface_type, interface_type_names),
+        lookup(device->info.interface_connection, interface_connection_names));
+    printf("  Media type:  %s\n", lookup(device->info.media_type, media_type_names));
+    printf("  Parent:      %u\n", device->info.parent_device);
+
+    printf("  Flags:      ");
+    if (device->info.flags & DeviceFlag_ReadOnly)
+        printf(" ReadOnly");
+    if (device->info.flags & DeviceFlag_CanEject)
+        printf(" CanEject");
+    if (device->info.flags & DeviceFlag_Debug)
+        printf(" Debug");
+    if (device->info.flags == 0)
+        printf(" None");
+    printf("\n");
+
     return NULL;
 }
-

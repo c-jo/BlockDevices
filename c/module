@@ -10,9 +10,13 @@
 #include "kernel.h"
 #include "swis.h"
 
-#include "modhead.h"
+#include "BlockDevicesHdr.h"
 #include "commands.h"
 #include "devices.h"
+
+#include "Global/Services.h"
+
+#define UNUSED(x) (void)x;
 
 // Are we up and running yet? (has startup been announced)
 static int running;
@@ -50,7 +54,11 @@ static void announce(int started)
  **************************************************************************/
 _kernel_oserror *Mod_Init(const char *tail, int podule_base, void *pw)
 {
+    UNUSED(tail)
+    UNUSED(podule_base)
+
     running = 0;
+
     if (devices_init())
     {
         /* Failed to start up? */
@@ -75,10 +83,35 @@ _kernel_oserror *Mod_Init(const char *tail, int podule_base, void *pw)
  **************************************************************************/
 _kernel_oserror *Mod_Final(int fatal, int podule_base, void *pw)
 {
+    UNUSED(fatal);
+    UNUSED(podule_base);
+
     _swix(OS_RemoveCallBack, _INR(0, 1), StartupCallback_Entry, pw);
+
     devices_final();
     if (running) announce(0);
     return NULL;
+}
+
+
+/***************************************************************************
+ * Function:     Mod_Service
+ * Description:  Service call handler routine. All services which are being
+ *               received by the module will be passed to this routine.
+ * Parameters:   service = service call number
+ *               r       = pointer to register block on entry
+ *               pw      = private word for module
+ * On exit:      Update register values on return by updating r.
+ **************************************************************************/
+void Mod_Service(int service, _kernel_swi_regs *r, void *pw)
+{
+  UNUSED(r)
+  UNUSED(pw)
+
+  if (service == Service_ShutDownComplete) {
+    printf("BlockDevices says bye.\n");
+    devices_final();
+  }
 }
 
 
@@ -93,6 +126,9 @@ _kernel_oserror *Mod_Final(int fatal, int podule_base, void *pw)
  **************************************************************************/
 _kernel_oserror *StartupCallback_Handler(_kernel_swi_regs *r, void *pw)
 {
+    UNUSED(r)
+    UNUSED(pw)
+
     running = 1;
     announce(1);
     return NULL;
@@ -152,6 +188,8 @@ _kernel_oserror *Mod_Command(const char *arg_string, int argc, int number,
  ******************************************************************/
 _kernel_oserror *SWI_Enumerate(int number, _kernel_swi_regs *r, void *pw)
 {
+    UNUSED(number)
+
     device_t *device = devices_after(devices_find(r->r[0]));
 
     if (device == NULL)
@@ -182,6 +220,8 @@ _kernel_oserror *SWI_Enumerate(int number, _kernel_swi_regs *r, void *pw)
  ******************************************************************/
 _kernel_oserror *SWI_EnumerateChildren(int number, _kernel_swi_regs *r, void *pw)
 {
+    UNUSED(number)
+
     device_t *device = devices_find(r->r[0]);
 
     do {
@@ -240,7 +280,7 @@ _kernel_oserror *SWI_Read(int number, _kernel_swi_regs *r, void *pw)
         return err_BadDevice;
 
     return device_transfer(device,
-                           BlockDeviceOp_Read,
+                           BlockDevices_Reason_Read,
                            (unsigned long)r->r[1],
                            (transfer_block_t*)r->r[2]);
 }
@@ -264,7 +304,7 @@ _kernel_oserror *SWI_Write(int number, _kernel_swi_regs *r, void *pw)
         return err_BadDevice;
 
     return device_transfer(device,
-                           BlockDeviceOp_Write,
+                           BlockDevices_Reason_Write,
                            (unsigned long)r->r[1],
                            (transfer_block_t*)r->r[2]);
 }
@@ -288,7 +328,7 @@ _kernel_oserror *SWI_Verify(int number, _kernel_swi_regs *r, void *pw)
         return err_BadDevice;
 
     return device_transfer(device,
-                           BlockDeviceOp_Verify,
+                           BlockDevices_Reason_Verify,
                            (unsigned long)r->r[1],
                            (transfer_block_t*)r->r[2]);
 }
@@ -312,7 +352,7 @@ _kernel_oserror *SWI_DeviceOp(int number, _kernel_swi_regs *r, void *pw)
         return err_BadDevice;
 
     return device_miscop(device,
-                         BlockDeviceOp_DeviceOp,
+                         BlockDevices_Reason_DeviceOp,
                          r);
 }
 
@@ -335,7 +375,7 @@ _kernel_oserror *SWI_MediaOp(int number, _kernel_swi_regs *r, void *pw)
         return err_BadDevice;
 
     return device_miscop(device,
-                         BlockDeviceOp_MediaOp,
+                         BlockDevices_Reason_MediaOp,
                          r);
 }
 
@@ -358,7 +398,7 @@ _kernel_oserror *SWI_SecurityOp(int number, _kernel_swi_regs *r, void *pw)
         return err_BadDevice;
 
     return device_miscop(device,
-                         BlockDeviceOp_SecurityOp,
+                         BlockDevices_Reason_SecurityOp,
                          r);
 }
 
@@ -381,7 +421,7 @@ _kernel_oserror *SWI_SectorOp(int number, _kernel_swi_regs *r, void *pw)
         return err_BadDevice;
 
     return device_miscop(device,
-                         BlockDeviceOp_SectorOp,
+                         BlockDevices_Reason_SectorOp,
                          r);
 }
 
@@ -404,7 +444,7 @@ _kernel_oserror *SWI_DriverOp(int number, _kernel_swi_regs *r, void *pw)
         return err_BadDevice;
 
     return device_miscop(device,
-                         BlockDeviceOp_DriverOp,
+                         BlockDevices_Reason_DriverOp,
                          r);
 }
 
@@ -426,6 +466,8 @@ _kernel_oserror *SWI_DriverOp(int number, _kernel_swi_regs *r, void *pw)
  ******************************************************************/
 _kernel_oserror *SWI_Register(int number, _kernel_swi_regs *r, void *pw)
 {
+    UNUSED(number)
+
     device_info_t *info = (device_info_t *)r->r[1];
     void *driver_code = (void *)r->r[2];
     void *driver_ws   = (void *)r->r[3];
@@ -467,6 +509,8 @@ _kernel_oserror *SWI_Register(int number, _kernel_swi_regs *r, void *pw)
  ******************************************************************/
 _kernel_oserror *SWI_Deregister(int number, _kernel_swi_regs *r, void *pw)
 {
+    UNUSED(number)
+
     int device_id = r->r[0];
 
     if (!running) return err_Starting;
@@ -491,6 +535,8 @@ Description:    Recans a device.
  ******************************************************************/
 _kernel_oserror *SWI_Rescan(int number, _kernel_swi_regs *r, void *pw)
 {
+    UNUSED(number)
+
     int device_id = r->r[0];
 
     if (!running) return err_Starting;
