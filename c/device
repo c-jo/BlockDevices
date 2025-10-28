@@ -19,6 +19,84 @@
 
 #include <stdio.h>
 
+static struct name_counter_s {
+    char *base_name;
+    unsigned parent_device;
+    int counter;
+    struct name_counter_s *next;
+} *name_counters = 0;
+
+/*******************************************************************
+ Function:      device_name
+ Description:   Generate a device name for the given device
+ Parameters:    base_name -> the base name to use for generation
+                parent_device_id -> the parent device ID
+ Returns:       pointer to allocated device name string, or NULL if failed
+ ******************************************************************/
+static char *device_name(const char *base_name, unsigned parent_device_id)
+{
+    char *name_buffer;
+    struct name_counter_s *counter_entry = NULL;
+    int sequence_number = 1;
+    int len;
+
+    if (!base_name)
+        return NULL;
+
+    len = strlen(base_name);
+
+    /* Check if name already ends with a number */
+    if (len > 0 && base_name[len - 1] >= '0' && base_name[len - 1] <= '9')
+    {
+        /* Name already ends with a number, use it as is */
+        name_buffer = malloc(len + 1);
+        if (name_buffer)
+            strcpy(name_buffer, base_name);
+        return name_buffer;
+    }
+
+    /* Find counter entry for this base name and parent device */
+    counter_entry = name_counters;
+    while (counter_entry)
+    {
+        if (strcmp(counter_entry->base_name, base_name) == 0 &&
+            counter_entry->parent_device == parent_device_id)
+            break;
+        counter_entry = counter_entry->next;
+    }
+
+    if (!counter_entry)
+    {
+        /* Create new counter entry */
+        counter_entry = malloc(sizeof(struct name_counter_s));
+        if (!counter_entry)
+            return NULL;
+
+        counter_entry->base_name = malloc(strlen(base_name) + 1);
+        if (!counter_entry->base_name)
+        {
+            free(counter_entry);
+            return NULL;
+        }
+        strcpy(counter_entry->base_name, base_name);
+        counter_entry->parent_device = parent_device_id;
+        counter_entry->counter = 1;
+        counter_entry->next = name_counters;
+        name_counters = counter_entry;
+    }
+
+    sequence_number = counter_entry->counter++;
+
+    /* Allocate buffer for the generated name */
+    name_buffer = malloc(strlen(base_name) + 16); /* Extra space for sequence number */
+    if (!name_buffer)
+        return NULL;
+
+    /* Generate the device name */
+    sprintf(name_buffer, "%s%d", base_name, sequence_number);
+
+    return name_buffer;
+}
 
 /*******************************************************************
  Function:      device_create
@@ -40,105 +118,32 @@ device_t *device_create(
 
     device = calloc(1, sizeof(*device));
     if (device == NULL)
-        goto failed;
-
-    /* Copy the fields to our device information block */
-    device->info.flags          = info->flags;
-    device->info.interface_type = info->interface_type;
-    device->info.interface_connection = info->interface_connection;
-    device->info.media_type     = info->media_type;
-    device->info.parent_device  = info->parent_device;
-    device->info.block_count    = info->block_count;
-    device->info.block_size     = info->block_size;
-
-  #if 0
-    /* Allocations for the name are slightly harder.
-     * The name on registration can be just a simple string, or it might be a device path.
-     * If it's a simple string, we need to construct a path based on the parents.
-     */
-    {
-        const char *name = info->name;
-        if (name == NULL || name[0] == '\0')
-        {
-            /* No name was given. Let's use an incrementing value. */
-            char newname[16];
-            sprintf(newname, "device-%i", unnamed_counter++);
-            device->info.name = strdup(newname);
-            if (device->info.name == NULL)
-                goto failed;
-        }
-        else if (name[0] == '/')
-        {
-            /* They gave a full device path, so just copy it */
-            device->info.name = strdup(info->name);
-            if (device->info.name == NULL)
-                goto failed;
-        }
-        else if (device->info.parent_device)
-        {
-            int ssize;
-            /* If there's a parent device, we construct a new name based on it */
-            device_t *parentdevice = devices_find(device->info.parent_device);
-            if (parentdevice == NULL)
-                goto failed;
-            ssize = strlen(parentdevice->info.name) + 1 + strlen(info->name) + 1;
-            device->info.name = calloc(1, ssize);
-            if (device->info.name == NULL)
-                goto failed;
-            sprintf(device->info.name, "%s/%s", parentdevice->info.name, info->name);
-        }
-        else
-        {
-            /* They gave a name without a leading '/', so prepend one */
-            device->info.name = calloc(1, strlen(info->name));
-            if (device->info.name == NULL)
-                goto failed;
-            device->info.name[0] = '/';
-            strcpy(device->info.name + 1, info->name);
-        }
-    }
-#endif
-
-    /* The other strings are easier to copy */
-#define STRDUP_OR_FAIL(_to, _from) \
-    do { \
-        if (_from) \
-        { \
-            _to = strdup(_from); \
-            if (_to == NULL) \
-                goto failed; \
-        } \
-        else \
-        { \
-            _to = NULL; \
-        } \
-    } while (0)
-
-//    STRDUP_OR_FAIL(device->info.manufacturer, info->manufacturer);
-//    STRDUP_OR_FAIL(device->info.product, info->product);
-//    STRDUP_OR_FAIL(device->info.serial, info->serial);
-//    STRDUP_OR_FAIL(device->info.firmware, info->firmware);
-    STRDUP_OR_FAIL(device->info.name,        info->name       );
-    STRDUP_OR_FAIL(device->info.description, info->description);
+        return NULL;
 
     device->driver_code = driver_code;
     device->driver_ws   = driver_ws;
     device->driver_ref  = driver_ref;
 
-    return device;
+    device->info.name                 = device_name(info->name,
+                                                    info->parent_device);
+    device->info.flags                = info->flags;
+    device->info.interface_type       = info->interface_type;
+    device->info.interface_connection = info->interface_connection;
+    device->info.media_type           = info->media_type;
+    device->info.parent_device        = info->parent_device;
+    device->info.block_count          = info->block_count;
+    device->info.block_size           = info->block_size;
+    device->info.description          = strdup(info->description);
 
-failed:
-    if (device)
-    {
-//        free(device->info.name);
-//        free(device->info.manufacturer);
-//        free(device->info.product);
-//        free(device->info.serial);
-//        free(device->info.firmware);
-          free(device->info.description);
-          free(device);
+    /* Check the strings are valid */
+    if (device->info.name == NULL || device->info.description == NULL) {
+        free(device->info.name);
+        free(device->info.description);
+        free(device);
+        return NULL;
     }
-    return NULL;
+
+    return device;
 }
 
 /*******************************************************************
@@ -148,7 +153,7 @@ failed:
                 transfer = the transfer address
  Returns:       pointer to error to return, or NULL if operation is acceptable
  ******************************************************************/
-_kernel_oserror *device_check_transfer(device_t *device, transfer_block_t *transfer)
+static _kernel_oserror *device_check_transfer(device_t *device, transfer_block_t *transfer)
 {
  #ifdef USE_LONG_LONG
     blockaddr_t transfer_end;
@@ -183,21 +188,13 @@ void device_destroy(device_t *device)
 {
     if (device)
     {
-//        device->info.manufacturer = NULL;
-//        free(device->info.manufacturer);
-//        device->info.manufacturer = NULL;
-//        free(device->info.product);
-//        device->info.product = NULL;
-//        free(device->info.serial);
-//        device->info.serial = NULL;
-//        free(device->info.firmware);
-//        device->info.firmware = NULL;
-        free(device->info.name);
-        free(device->info.description);
-        free(device);
+      free(device->info.name);
+      device->info.name = NULL;
+      free(device->info.description);
+      device->info.description = NULL;
+      free(device);
     }
 }
-
 
 /*******************************************************************
  Function:      device_transfer
@@ -222,7 +219,6 @@ _kernel_oserror * device_transfer(device_t *device, unsigned int entry, unsigned
                   device->device_id, flags, block,
                   entry, device->driver_ref);
 }
-
 
 /*******************************************************************
  Function:      device_miscop

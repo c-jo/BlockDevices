@@ -5,6 +5,7 @@
  ******************************************************************/
 
 #include <stdlib.h>
+#include <string.h>
 #include "kernel.h"
 
 #include "devices.h"
@@ -81,6 +82,7 @@ int devices_final(void)
 {
     device_t *device = devices;
 
+    /* clean up all the devices */
     while (device)
     {
         device_t *next = device->next;
@@ -241,12 +243,12 @@ device_t *devices_find(int device_id)
 
 
 /*******************************************************************
- Function:      devices_finddevice_after
- Description:   Find a device AFTER a given the device_id
- Parameters:    device_id = device id to find the device after, or 0
-                for the first one
- Returns:       pointer to the next device, if found
-                NULL if no more devices found
+ Function:      devices_after
+ Description:   Find the device AFTER the given one
+ Parameters:    device -> device to find the one after, or NULL
+                to find first device.
+ Returns:       pointer to the next device,
+                NULL if no more device found
  ******************************************************************/
 device_t *devices_after(device_t *device)
 {

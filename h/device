@@ -17,7 +17,6 @@ typedef struct device_s {
     void *            driver_code;
     void *            driver_ws;
     void *            driver_ref;
-    char *            devicefs_name;
 } device_t;
 
 
