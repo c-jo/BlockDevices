@@ -9,6 +9,8 @@
 #include <stdlib.h>
 #include <ctype.h>
 
+#include "str.h"
+
 #ifdef FORTIFY
 #include <stdio.h>
 #include "fortify.h"

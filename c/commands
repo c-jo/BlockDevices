@@ -13,6 +13,11 @@
 #include "BlockDevicesHdr.h"
 #include "commands.h"
 #include "devices.h"
+#include "str.h"
+
+#include "DebugLib/DebugLib.h"
+
+#define UNUSED(x) (void)x
 
 typedef struct idmessages_s {
     int num;
@@ -32,15 +37,14 @@ static idmessages_t interface_type_names[] = {
     { IDMESSAGE_LAST }
 };
 
-
-static idmessages_t interface_connection_names[] = {
-    { BlockDevice_InterfaceConnection_Unknown, "-" },
-    { BlockDevice_InterfaceConnection_Motherboard, "M/B" },
-    { BlockDevice_InterfaceConnection_Podule, "Podule" },
-    { BlockDevice_InterfaceConnection_PCI, "PCI" },
-    { BlockDevice_InterfaceConnection_Parallel, "Paralllel" },
-    { BlockDevice_InterfaceConnection_Serial, "Serial" },
-    { BlockDevice_InterfaceConnection_USB, "USB" },
+static idmessages_t connection_type_names[] = {
+    { BlockDevice_ConnectionType_Unknown, "-" },
+    { BlockDevice_ConnectionType_Motherboard, "M/B" },
+    { BlockDevice_ConnectionType_Podule, "Podule" },
+    { BlockDevice_ConnectionType_PCI, "PCI" },
+    { BlockDevice_ConnectionType_Parallel, "Paralllel" },
+    { BlockDevice_ConnectionType_Serial, "Serial" },
+    { BlockDevice_ConnectionType_USB, "USB" },
     { IDMESSAGE_LAST }
 };
 
@@ -56,13 +60,15 @@ static idmessages_t media_type_names[] = {
     { IDMESSAGE_LAST }
 };
 
-static idmessages_t partition_scheme_names[] = {
-    { BlockDevice_PartitionType_MBR, "MBR" },
-    { BlockDevice_PartitionType_GPT, "GPT" },
-//    { BlockDevices_PartitionType_FileCore, "FileCore" },
+static idmessages_t device_type_names[] = {
+    { BlockDevice_DeviceType_Unknown, "-" },
+    { BlockDevice_DeviceType_Controller, "Controller" },
+    { BlockDevice_DeviceType_Drive, "Drive" },
+    { BlockDevice_DeviceType_Disc, "Disc" },
+    { BlockDevice_DeviceType_Partition, "Partition" },
+    { BlockDevice_DeviceType_Track, "Track" },
     { IDMESSAGE_LAST }
 };
-
 
 /*******************************************************************
  Function:      format_capacity
@@ -75,7 +81,14 @@ static char *unit_names[] = { "B", "KB", "MB", "GB", "TB" };
 
 static void format_capacity(UINT64 block_count, unsigned block_size, char *buffer)
 {
-    unsigned long count, units = 0;
+    if (block_count == 0 || block_size == 0)
+    {
+      *buffer++ = '-';
+      *buffer   = 0;
+      return;
+    }
+
+    unsigned long units = 0;
     double value;
 //    LL_L2UI(count, block_count);
     value = block_count;
@@ -89,6 +102,15 @@ static void format_capacity(UINT64 block_count, unsigned block_size, char *buffe
     sprintf(buffer, "%0.1f %s", value, unit_names[units]);
 }
 
+static void format_id(unsigned long id, char *buffer, int indent)
+{
+    int i;
+    for (i = 0; i < indent && i < 50; i++)
+        *buffer++ = ' ';
+    sprintf(buffer, "%d", (int)id);
+}
+
+
 /*******************************************************************
  Function:      lookup
  Description:   Look up a descriptions in a table.
@@ -96,7 +118,7 @@ static void format_capacity(UINT64 block_count, unsigned block_size, char *buffe
                 msgs-> the table of messages (idmessages_t list)
  Returns:       pointer to the message, or def if no value found.
  ******************************************************************/
-const char *lookup(int num, idmessages_t *msgs)
+static const char *lookup(int num, idmessages_t *msgs)
 {
   /* FIXME: Internationalising these message lookups
      could be done here if we cared */
@@ -108,73 +130,116 @@ const char *lookup(int num, idmessages_t *msgs)
         }
         msgs++;
     }
-    return "Unknown";
+    return "?";
 }
 
 /*******************************************************************
- Function:      find_max_device_depth
- Description:   Find the maximum depth of devices in the tree
- Parameters:    device = device to check (or NULL for root level)
-                current_depth = current depth level
- Returns:       Maximum depth found
+ Function:      count_devices
+ Description:   Count the total number of devices
+ Parameters:    None
+ Returns:       Total number of devices
  ******************************************************************/
-static int find_max_device_depth(device_t *device, int current_depth)
+static int count_devices(void)
 {
-    int max_depth = current_depth;
-    device_t *child = NULL;
-    unsigned parent_id = (device == NULL) ? 0 : device->device_id;
+    device_t *device = NULL;
+    int count = 0;
 
-    // Find all children of this device (or root devices if device is NULL)
-    for (child = 0; (child = devices_after(child)) != NULL; )
+    while ((device = devices_after(device)) != NULL)
     {
-        if (child->info.parent_device == parent_id)
-        {
-            int child_depth = find_max_device_depth(child, current_depth + 1);
-            if (child_depth > max_depth)
-                max_depth = child_depth;
-        }
+        count++;
     }
 
-    return max_depth;
+    return count;
 }
 
 /*******************************************************************
- Function:      display_device_and_children
- Description:   Display a device and its children recursively
- Parameters:    device = device to display
-                indent = indentation level (number of spaces)
+ Function:      populate_device_table
+ Description:   Populate table with device info recursively
+ Parameters:    device = device to add
+                indent = indentation level
+                table = pointer to table array
+                row = pointer to current row index
  Returns:       None
  ******************************************************************/
-static void display_device_and_children(device_t *device, int indent)
+static void populate_device_table(device_t *device, int indent, char **table, int *row)
 {
     char capacity[16];
-    char indent_str[64];
-    int i;
+    char id[64];
 
-    // Create indentation string
-    for (i = 0; i < indent && i < 63; i++)
-        indent_str[i] = ' ';
-    indent_str[i] = '\0';
+    dprintf(("", "populate_device_table(device %ld, row %d)\n", device->id, *row));
+
+    format_id(device->id, id, indent);
 
     format_capacity(device->info.block_count, device->info.block_size, capacity);
 
-    printf("%s%-4i %s %-24s %-8s %-5s %-5s\n",
-           indent_str,
-           (int)device->device_id,
-           device->info.name,
-           device->info.description,
-           capacity,
-           lookup(device->info.interface_type, interface_type_names),
-           lookup(device->info.media_type, media_type_names)
-           );
+    // Column 0: Device ID with indentation
+    table[*row * 8 + 0] = strdup(id);
 
-    // Display children
+    // Column 1: Name
+    table[*row * 8 + 1] = strdup(device->info.name);
+
+    // Column 2: Description
+    table[*row * 8 + 2] = strdup(device->info.description);
+
+    // Column 3: Type
+    table[*row * 8 + 3] = strdup(lookup(device->info.device_type, device_type_names));
+
+    // Column 4: Interface
+    table[*row * 8 + 4] = strdup(lookup(device->info.interface_type, interface_type_names));
+
+    // Column 5: Connection
+    table[*row * 8 + 5] = strdup(lookup(device->info.connection_type, connection_type_names));
+
+    // Column 6: Media
+    table[*row * 8 + 6] = strdup(lookup(device->info.media_type, media_type_names));
+
+    // Column 7: Capacity
+    table[*row * 8 + 7] = strdup(capacity);
+
+    (*row)++;
+
+    // Process children
     device_t *child = NULL;
     for (child = 0; (child = devices_after(child)) != NULL; )
     {
-        if (child->info.parent_device == device->device_id)
+        if (child->info.parent_device == device->id)
         {
-            display_device_and_children(child, indent + 2);
+            populate_device_table(child, indent + 2, table, row);
+        }
+    }
+}
+
+/*******************************************************************
+ Function:      calculate_column_widths
+ Description:   Find the longest string in each column
+ Parameters:    table = pointer to table array
+                rows = number of rows
+                cols = number of columns
+                headers = pointer to array of column headers
+                widths = pointer to array to store column widths
+ Returns:       None
+ ******************************************************************/
+static void calculate_column_widths(char **table, int rows, int cols, char **headers, int *widths)
+{
+    dprintf(("", "Calculating column width\n"));
+    int row, col;
+
+    // Initialize widths to that of the headers
+    for (col = 0; col < cols; col++)
+    {
+        widths[col] = strlen(headers[col]);
+    }
+
+    // Find longest string in each column
+    for (row = 0; row < rows; row++)
+    {
+        for (col = 0; col < cols; col++)
+        {
+            int len = strlen(table[row * cols + col]);
+            if (len > widths[col])
+            {
+                widths[col] = len;
+            }
         }
     }
 }
@@ -189,27 +254,66 @@ static void display_device_and_children(device_t *device, int indent)
 _kernel_oserror *Cmd_BlockDevices(void)
 {
     device_t *device = NULL;
-    int max_depth = find_max_device_depth(NULL, 0);
-    int header_padding = max_depth * 2; // 2 spaces per level
-    char padding_str[64];
-    int i;
+    int device_count = count_devices();
+    dprintf(("", "Got %d devices\n", device_count));
+    int i, row = 0;
+    int col_width[8];
+    char *header[8] = { "Device", "Name", "Description",
+                        "Type", "I/F.", "Con.", "Media", "Capacity" };
 
-    // Create padding string for header
-    for (i = 0; i < header_padding && i < 63; i++)
-        padding_str[i] = ' ';
-    padding_str[i] = '\0';
+    // Allocate table: device_count rows x 8 columns
+    char **table = (char **)malloc(device_count * 8 * sizeof(char *));
+    if (table == NULL)
+    {
+        return NULL;
+    }
 
-    printf("%-4s%s %-24s %-8s %-5s %-5s\n",
-           "Dev.", padding_str, "Description", "Capacity", "IFace", "Media");
-
-    // Display root devices (parent_device = 0) and their children
+    // Populate table with top level devices
+    // (the function will recursively add children)
     for (device = 0; (device=devices_after(device)) != NULL; )
     {
         if (device->info.parent_device == 0)
         {
-            display_device_and_children(device, 0);
+            populate_device_table(device, 0, table, &row);
         }
     }
+
+    // Calculate column widths
+    calculate_column_widths(table, row, 8, header, col_width);
+
+    // Print the header
+    printf("%-*s %-*s %-*s %-*s %-*s %-*s %-*s %-*s\n",
+           col_width[0], header[0],
+           col_width[1], header[1],
+           col_width[2], header[2],
+           col_width[3], header[3],
+           col_width[4], header[4],
+           col_width[5], header[5],
+           col_width[6], header[6],
+           col_width[7], header[7]
+           );
+
+    // Print the table
+    for (i = 0; i < row; i++)
+    {
+        printf("%-*s %-*s %-*s %-*s %-*s %-*s %-*s %-*s\n",
+               col_width[0], table[i * 8 + 0],
+               col_width[1], table[i * 8 + 1],
+               col_width[2], table[i * 8 + 2],
+               col_width[3], table[i * 8 + 3],
+               col_width[4], table[i * 8 + 4],
+               col_width[5], table[i * 8 + 5],
+               col_width[6], table[i * 8 + 6],
+               col_width[7], table[i * 8 + 7]);
+    }
+
+    // Free table memory
+    for (i = 0; i < device_count * 8; i++)
+    {
+        free(table[i]);
+    }
+
+    free(table);
     return NULL;
 }
 
@@ -222,6 +326,7 @@ _kernel_oserror *Cmd_BlockDevices(void)
  ******************************************************************/
 _kernel_oserror *Cmd_BlockDeviceInfo(const char *arg_string, int argc)
 {
+    UNUSED(argc);
     device_t *device=devices_find(atoi(arg_string));
 
     if (device == NULL)
@@ -232,16 +337,19 @@ _kernel_oserror *Cmd_BlockDeviceInfo(const char *arg_string, int argc)
     char capacity[16];
     format_capacity(device->info.block_count, device->info.block_size, capacity);
 
-    printf("Device %d information:\n", (int)device->device_id);
+    printf("Device %d information:\n", (int)device->id);
     printf("  Description: %s\n", device->info.description ? device->info.description : "Unknown");
     printf("  Size:        %llu blocks of %d bytes (%s)\n",
         (unsigned long long)device->info.block_count,
         device->info.block_size,
         capacity);
+    printf("  Device type: %s\n",
+        lookup(device->info.device_type, device_type_names));
     printf("  Interface:   %s (%s)\n",
-        lookup(device->info.interface_type, interface_type_names),
-        lookup(device->info.interface_connection, interface_connection_names));
-    printf("  Media type:  %s\n", lookup(device->info.media_type, media_type_names));
+        lookup(device->info.interface_type,  interface_type_names ),
+        lookup(device->info.connection_type, connection_type_names));
+    printf("  Media type:  %s\n",
+        lookup(device->info.media_type, media_type_names));
     printf("  Parent:      %u\n", device->info.parent_device);
 
     printf("  Flags:      ");

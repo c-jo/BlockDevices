@@ -17,6 +17,8 @@
 #include "devices.h"
 #include "str.h"
 
+#include "DebugLib/DebugLib.h"
+
 #include <stdio.h>
 
 static struct name_counter_s {
@@ -29,73 +31,58 @@ static struct name_counter_s {
 /*******************************************************************
  Function:      device_name
  Description:   Generate a device name for the given device
- Parameters:    base_name -> the base name to use for generation
-                parent_device_id -> the parent device ID
- Returns:       pointer to allocated device name string, or NULL if failed
+ Parameters:    info -> the device information block
+ Returns:       pointer to device name string.
  ******************************************************************/
-static char *device_name(const char *base_name, unsigned parent_device_id)
+static char *device_name(const device_info_t *info)
 {
-    char *name_buffer;
-    struct name_counter_s *counter_entry = NULL;
-    int sequence_number = 1;
-    int len;
+    int sequence_number = info->device_index;
 
-    if (!base_name)
+    if (!info || !info->name)
         return NULL;
 
-    len = strlen(base_name);
-
-    /* Check if name already ends with a number */
-    if (len > 0 && base_name[len - 1] >= '0' && base_name[len - 1] <= '9')
+    if (sequence_number == 0)
     {
-        /* Name already ends with a number, use it as is */
-        name_buffer = malloc(len + 1);
-        if (name_buffer)
-            strcpy(name_buffer, base_name);
-        return name_buffer;
+      /* Index not specified, find counter entry for this name/parent device */
+      struct name_counter_s *counter_entry = name_counters;
+      while (counter_entry)
+      {
+          if (strcmp(counter_entry->base_name, info->name) == 0 &&
+              counter_entry->parent_device == info->parent_device)
+              break;
+          counter_entry = counter_entry->next;
+      }
+
+      if (!counter_entry)
+      {
+          /* Create new counter entry */
+          counter_entry = malloc(sizeof(struct name_counter_s));
+          if (!counter_entry)
+              return NULL;
+
+          counter_entry->base_name = malloc(strlen(info->name) + 1);
+          if (!counter_entry->base_name)
+          {
+              free(counter_entry);
+              return NULL;
+          }
+          strcpy(counter_entry->base_name, info->name);
+          counter_entry->parent_device = info->parent_device;
+          counter_entry->counter = 1;
+          counter_entry->next = name_counters;
+          name_counters = counter_entry;
+      }
+
+      sequence_number = counter_entry->counter++;
     }
 
-    /* Find counter entry for this base name and parent device */
-    counter_entry = name_counters;
-    while (counter_entry)
-    {
-        if (strcmp(counter_entry->base_name, base_name) == 0 &&
-            counter_entry->parent_device == parent_device_id)
-            break;
-        counter_entry = counter_entry->next;
-    }
-
-    if (!counter_entry)
-    {
-        /* Create new counter entry */
-        counter_entry = malloc(sizeof(struct name_counter_s));
-        if (!counter_entry)
-            return NULL;
-
-        counter_entry->base_name = malloc(strlen(base_name) + 1);
-        if (!counter_entry->base_name)
-        {
-            free(counter_entry);
-            return NULL;
-        }
-        strcpy(counter_entry->base_name, base_name);
-        counter_entry->parent_device = parent_device_id;
-        counter_entry->counter = 1;
-        counter_entry->next = name_counters;
-        name_counters = counter_entry;
-    }
-
-    sequence_number = counter_entry->counter++;
-
-    /* Allocate buffer for the generated name */
-    name_buffer = malloc(strlen(base_name) + 16); /* Extra space for sequence number */
-    if (!name_buffer)
-        return NULL;
+    char *name = malloc(strlen(info->name) + 16);
 
     /* Generate the device name */
-    sprintf(name_buffer, "%s%d", base_name, sequence_number);
-
-    return name_buffer;
+    if (name) {
+      sprintf(name, "%s-%d", info->name, sequence_number);
+    }
+    return name;
 }
 
 /*******************************************************************
@@ -109,31 +96,62 @@ static char *device_name(const char *base_name, unsigned parent_device_id)
  Returns:       pointer to the device_t, or NULL if failed
  ******************************************************************/
 device_t *device_create(
-              device_info_t * info,
-              void *          driver_code,
-              void *          driver_ws,
-              void *          driver_ref)
+              device_info_t *info,
+              void          *driver_code,
+              void          *driver_ws,
+              void          *driver_ref)
 {
-    device_t *device;
-
-    device = calloc(1, sizeof(*device));
+    device_t *device = calloc(1, sizeof(*device));
     if (device == NULL)
         return NULL;
 
-    device->driver_code = driver_code;
-    device->driver_ws   = driver_ws;
-    device->driver_ref  = driver_ref;
+    device_t *parent = devices_find(info->parent_device);
 
-    device->info.name                 = device_name(info->name,
-                                                    info->parent_device);
-    device->info.flags                = info->flags;
-    device->info.interface_type       = info->interface_type;
-    device->info.interface_connection = info->interface_connection;
-    device->info.media_type           = info->media_type;
-    device->info.parent_device        = info->parent_device;
-    device->info.block_count          = info->block_count;
-    device->info.block_size           = info->block_size;
-    device->info.description          = strdup(info->description);
+    dprintf(("", "creating device '%s' (parent: %d [%p])\n",
+                 info->description, info->parent_device, (void*)parent));
+
+    if (info->device_type == BlockDevice_DeviceType_Parent) {
+      if (!parent) return NULL;
+      dprintf(("", "use pareent device type (%d)\n", parent->info.device_type));
+      device->info.device_type = parent->info.device_type;
+    }
+    else {
+      dprintf(("", "device type: %d\n", info->device_type));
+      device->info.device_type = info->device_type;
+    }
+
+    if (info->interface_type == BlockDevice_InterfaceType_Parent) {
+      if (!parent) return NULL;
+      dprintf(("", "use parent interface type (%d)\n", parent->info.interface_type));
+      device->info.interface_type = parent->info.interface_type;
+    }
+    else {
+      dprintf(("", "interface type: %d\n", info->interface_type));
+      device->info.interface_type = info->interface_type;
+    }
+
+    if (info->connection_type == BlockDevice_ConnectionType_Parent) {
+      if (!parent) return NULL;
+      dprintf(("", "use parent connection type (%d)\n", parent->info.connection_type));
+      device->info.connection_type = parent->info.connection_type;
+    }
+    else {
+      dprintf(("", "connecion type: %d\n", info->connection_type));
+      device->info.connection_type = info->connection_type;
+    }
+
+    if (info->media_type == BlockDevice_MediaType_Parent) {
+      if (!parent) return NULL;
+      dprintf(("", "use parent media type (%d)\n", parent->info.media_type));
+      device->info.media_type = parent->info.media_type;
+    }
+    else {
+      dprintf(("", "media_type: %d\n", info->media_type));
+      device->info.media_type = info->media_type;
+    }
+
+    device->info.name        = device_name(info);
+    device->info.description = strdup(info->description);
 
     /* Check the strings are valid */
     if (device->info.name == NULL || device->info.description == NULL) {
@@ -142,6 +160,17 @@ device_t *device_create(
         free(device);
         return NULL;
     }
+
+    device->info.flags           = info->flags;
+
+    device->info.parent_device   = info->parent_device;
+    device->info.device_index    = info->device_index;
+    device->info.block_count     = info->block_count;
+    device->info.block_size      = info->block_size;
+
+    device->driver_code = driver_code;
+    device->driver_ws   = driver_ws;
+    device->driver_ref  = driver_ref;
 
     return device;
 }
@@ -188,13 +217,21 @@ void device_destroy(device_t *device)
 {
     if (device)
     {
-      free(device->info.name);
-      device->info.name = NULL;
-      free(device->info.description);
-      device->info.description = NULL;
-      free(device);
+//        device->info.manufacturer = NULL;
+//        free(device->info.manufacturer);
+//        device->info.manufacturer = NULL;
+//        free(device->info.product);
+//        device->info.product = NULL;
+//        free(device->info.serial);
+//        device->info.serial = NULL;
+//        free(device->info.firmware);
+//        device->info.firmware = NULL;
+        free(device->info.name);
+        free(device->info.description);
+        free(device);
     }
 }
+
 
 /*******************************************************************
  Function:      device_transfer
@@ -216,9 +253,10 @@ _kernel_oserror * device_transfer(device_t *device, unsigned int entry, unsigned
 
     return _callx(device->driver_code, device->driver_ws,
                   _INR(0, 2) | _INR(8, 9),
-                  device->device_id, flags, block,
+                  device->id, flags, block,
                   entry, device->driver_ref);
 }
+
 
 /*******************************************************************
  Function:      device_miscop

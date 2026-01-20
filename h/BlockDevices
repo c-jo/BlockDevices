@@ -2,10 +2,14 @@
  * File:        BlockDevice
  * Purpose:     Constants for accessing the block driver interfaces
  * Author:      Chris Johns
+ * Notes:       To add a new constant, please submit a MR on this file
+ *              with the required change, otherwise there is no guarantee
+ *              that values won't clash.
  ******************************************************************/
+#ifndef BLOCKDEVICES_H
+#define BLOCKDEVICES_H
 
-#ifndef BlockDevice_H
-#define BlockDevice_H
+#define BLOCKDEVICES_VERSION 150
 
 #ifndef CMHG
 #ifdef USE_LONG_LONG
@@ -30,70 +34,76 @@
 // The address of a block on a device
 typedef UINT64 blockaddr_t;
 
-// Interface types
+// Device Types
+typedef enum device_type_e {
+  BlockDevice_DeviceType_Unknown    = 0,
+  BlockDevice_DeviceType_Controller = 1,
+  BlockDevice_DeviceType_Drive      = 2,
+  BlockDevice_DeviceType_Disc       = 3,
+  BlockDevice_DeviceType_Partition  = 4,
+  BlockDevice_DeviceType_Track      = 5,
+  BlockDevice_DeviceType_Parent     = -1
+} device_type_t;
+
+// Interface Types
 typedef enum interface_type_e {
     BlockDevice_InterfaceType_Unknown = 0,
-    BlockDevice_InterfaceType_FDC     = 0x4f4c464c, // FLOP
-    BlockDevice_InterfaceType_ST506   = 0x494e4957, // WINI
-    BlockDevice_InterfaceType_IDE     = 0x45444950, // PIDE
-    BlockDevice_InterfaceType_SATA    = 0x41544153, // SATA
-    BlockDevice_InterfaceType_SCSI    = 0x49534353, // SCSI
-    BlockDevice_InterfaceType_NVMe    = 0x654d564e, // NVMe
-    BlockDevice_InterfaceType_RAM     = 0x2e4d4152  // RAM.
+    BlockDevice_InterfaceType_FDC     = 1,
+    BlockDevice_InterfaceType_ST506   = 2,
+    BlockDevice_InterfaceType_IDE     = 3,
+    BlockDevice_InterfaceType_SATA    = 4,
+    BlockDevice_InterfaceType_SCSI    = 5,
+    BlockDevice_InterfaceType_NVMe    = 6,
+    BlockDevice_InterfaceType_RAM     = 7,
+    BlockDevice_InterfaceType_Parent  = -1
 } interface_type_t;
 
-// Interface Connections
-typedef enum interface_connection_e {
-    BlockDevice_InterfaceConnection_Unknown = 0,
-    BlockDevice_InterfaceConnection_Motherboard = 0x4f424f4d, // MOBO
-    BlockDevice_InterfaceConnection_Podule      = 0x4c444f50, // PODL
-    BlockDevice_InterfaceConnection_PCI         = 0x2e494350, // PCI.
-    BlockDevice_InterfaceConnection_Parallel    = 0x4c524150, // PARL
-    BlockDevice_InterfaceConnection_Serial      = 0x4c524553, // SERL
-    BlockDevice_InterfaceConnection_USB         = 0x2e425355  // USB.
-} interface_connection_t;
+// Connection Types
+typedef enum interface_connection_type_e {
+    BlockDevice_ConnectionType_Unknown     = 0,
+    BlockDevice_ConnectionType_Motherboard = 1,
+    BlockDevice_ConnectionType_Podule      = 2,
+    BlockDevice_ConnectionType_PCI         = 3,
+    BlockDevice_ConnectionType_Parallel    = 4,
+    BlockDevice_ConnectionType_Serial      = 5,
+    BlockDevice_ConnectionType_USB         = 6,
+    BlockDevice_ConnectionType_Parent      = -1
+} connection_type_t;
 
-// Media types
+// Media Types
 typedef enum media_type_e {
     BlockDevice_MediaType_Unknown  = 0,
-    BlockDevice_MediaType_Floppy   = 0x4f4c464c, // FLOP
-    BlockDevice_MediaType_HardDisc = 0x44524148, // HARD
-    BlockDevice_MediaType_SSD      = 0x44445353, // SSDD
-    BlockDevice_MediaType_RAM      = 0x2e4d4152, // RAM.
-    BlockDevice_MediaType_CD       = 0x44434443, // CDCD
-    BlockDevice_MediaType_DVD      = 0x2E445644, // DVD.
-    BlockDevice_MediaType_BluRay   = 0x59524c42  // BLRY
+    BlockDevice_MediaType_Floppy   = 1,
+    BlockDevice_MediaType_HardDisc = 2,
+    BlockDevice_MediaType_SSD      = 3,
+    BlockDevice_MediaType_RAM      = 4,
+    BlockDevice_MediaType_CD       = 5,
+    BlockDevice_MediaType_DVD      = 6,
+    BlockDevice_MediaType_BluRay   = 7,
+    BlockDevice_MediaType_Parent   = -1
 } media_type_t;
 
-// Block device info block
+// Device Info
 typedef struct device_info_s {
-    char *                 name;
-    unsigned               flags;
-    interface_type_t       interface_type;
-    interface_connection_t interface_connection;
-    media_type_t           media_type;
-    unsigned               parent_device;
-    blockaddr_t            block_count;
-    unsigned               block_size;
-    char *                 description;
+    char             *name;
+    unsigned          flags;
+    unsigned          parent_device;
+    unsigned          device_index;
+    blockaddr_t       block_count;
+    unsigned          block_size;
+    device_type_t     device_type;
+    interface_type_t  interface_type;
+    connection_type_t connection_type;
+    media_type_t      media_type;
+    char             *description;
 } device_info_t;
 
 // Used to control IO operations
 typedef struct transfer_block_s {
-  blockaddr_t lba;
-  void *      address;
-  unsigned    count;
+  blockaddr_t  lba;
+  void        *address; // Ignored for verify
+  unsigned     count;   // In blocks
 } transfer_block_t;
-
-// Block sizes
-typedef struct block_size_s {
-  unsigned size;      // Block size, in bytes
-  unsigned flags;     // Flags
-  struct {
-    signed value;        // Relative priority
-    char  *description;  // Priority description (optional)
-  } priority;
-} block_size_t;
 
 /* Reason codes for the driver */
 #define BlockDevices_Reason_Read        1
@@ -105,8 +115,18 @@ typedef struct block_size_s {
 #define BlockDevices_Reason_SectorOp    7
 #define BlockDevices_Reason_DriverOp    8
 
-/* MiscOps */
-#define BlockDevice_DeviceOp_SMART 0x54524D53 // SMRT
+/*
+ * DeviceOps
+ */
+#define BlockDevice_DeviceOp_SerialNumber  1
+#define BlockDevice_DeviceOp_ModelName     2
+#define BlockDevice_DeviceOp_Firmware      3
+#define BlockDevice_DeviceOp_SMART         4
+#define BlockDevice_DeviceOp_PartitionInfo 5
+#define BlockDevice_DeviceOp_SelfTestLog   6
+#define BlockDevice_DeviceOp_SelfTest      7
+
+/* SMART */
 #define BlockDevice_DeviceOp_SMART_Flag_Raw 0x01
 
 typedef struct smart_attribute_header_s {
@@ -133,31 +153,23 @@ typedef struct smart_attribute_header_s {
 #define BlockDevice_SMART_Attribute_Type_SCSI    0x02
 #define BlockDevice_SMART_Attribute_Type_NVMe    0x03
 
-#define BlockDevice_DeviceOp_SerialNumber 0x4c524553 // SERL
-#define BlockDevice_DeviceOp_ModelName    0x4c444f4d // MODL
-#define BlockDevice_DeviceOp_Firmware     0x45525746 // FWRE
+/* Partition Types */
+#define BlockDevice_PartitionType_MBR 1
+#define BlockDevice_PartitionType_GPT 2
 
-#define BlockDevice_DeviceOp_PartitionInfo   0x54524150 // PART
-#define BlockDevice_PartitionType_MBR        0x2e52424d // MBR.
-#define BlockDevice_PartitionType_GPT        0x2e545047 // GPT.
-
-#define BlockDevice_DeviceOp_SelfTestLog 0x53454c47 // STLG
-#define BlockDevice_DeviceOp_SelfTestLog_Flag_Raw 0x1
-
+/* Self-Test */
 #define BlockDevice_SelfTest_Status_Completed  0x00
 #define BlockDevice_SelfTest_Status_Failed     0x01
 #define BlockDevice_SelfTest_Status_Aborted    0x02
 #define BlockDevice_SelfTest_Status_Running    0x80
 #define BlockDevice_SelfTest_Status_Unknown    0xff
 
-#define BlockDevice_DeviceOp_SelfTest 0x53454c54 // STES
-
 typedef enum {
-  BlockDevice_SelfTest_Short      = 0x54524853, // SHRT
-  BlockDevice_SelfTest_Long       = 0x474e4f4c, // LONG
-  BlockDevice_SelfTest_Conveyance = 0x564E4F43, // CONV
-  BlockDevice_SelfTest_Extended   = 0x4e545845, // EXTN
-  BlockDevice_SelfTest_Abort      = 0x54524241  // ABRT
+  BlockDevice_SelfTest_Short      = 1,
+  BlockDevice_SelfTest_Long       = 2,
+  BlockDevice_SelfTest_Conveyance = 3,
+  BlockDevice_SelfTest_Extended   = 4,
+  BlockDevice_SelfTest_Abort      = -1,
 } test_type_t;
 
 typedef __packed struct self_test_result_s {
@@ -172,15 +184,38 @@ typedef __packed struct self_test_result_s {
   uint32_t         reserved[6];  //
 } self_test_result_t;
 
-#define BlockDevice_SectorOp_TRIM 0x4D495254 // TRIM
+#define BlockDevice_DeviceOp_SelfTestLog_Flag_Raw 0x1
 
+/*
+ * SectorOps
+ */
+#define BlockDevice_SectorOp_TRIM 1
+
+/* TRIM */
 typedef struct trim_request_s {
   uint64_t start_lba; // Starting LBA
   uint32_t count;     // Number of blocks to trim
 } trim_request_t;
 
-#define BlockDevice_MediaOp_BlockSizes   0x5a534b42 // BKSZ
-#define BlockDevice_MediaOp_SetBlockSize 0x5a534253 // SBSZ
+/*
+ * MediaOps
+ */
+#define BlockDevice_MediaOp_BlockSizes   1
+#define BlockDevice_MediaOp_SetBlockSize 2
+
+/* BlockSizes */
+typedef struct block_size_s {
+  unsigned size;         // Block size, in bytes
+  unsigned flags;        // Flags
+  struct {
+    signed  value;       // Relative priority
+    char   *description; // Priority description (optional)
+  } priority;
+} block_size_t;
+
+/*
+ * SecurityOps
+ */
 
 #endif
 

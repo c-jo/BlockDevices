@@ -5,7 +5,6 @@
  ******************************************************************/
 
 #include <stdlib.h>
-#include <string.h>
 #include "kernel.h"
 
 #include "devices.h"
@@ -13,9 +12,13 @@
 
 #include "swis.h"
 
+#include "DebugLib/DebugLib.h"
+
 #include "BlockDevicesHdr.h"
 
-device_t* devices = 0;
+#define UNUSED(x) (void)x;
+
+static device_t* devices = 0;
 
 static int next_id = 1;
 
@@ -33,10 +36,16 @@ static struct notify_list_s {
  ******************************************************************/
 static void device_notify_announce(device_t *device, int started)
 {
-    _swix(OS_ServiceCall, _INR(0,1),
-                          device->device_id,
+  dprintf(("", "announcing device %lu %s %p\n",
+               device->id,
+               started ? "STARTED" : "STOPPED",
+               (void*)&(device->info)));
+
+  _swix(OS_ServiceCall, _INR(0,2),
+                          device->id,
                           started ? Service_BlockDevices_DeviceAdded
-                                  : Service_BlockDevices_DeviceRemoved);
+                                  : Service_BlockDevices_DeviceRemoved,
+                          &device->info);
 }
 
 /*******************************************************************
@@ -45,17 +54,26 @@ static void device_notify_announce(device_t *device, int started)
  ******************************************************************/
 _kernel_oserror *AnnounceCallback_Handler(_kernel_swi_regs *r, void *pw)
 {
-    while (notify_list) {
-        int irqs_disabled = _kernel_irqs_disabled();
-        struct notify_list_s *item = 0;
-        if (!irqs_disabled) _kernel_irqs_off();
-        item = notify_list;
-        notify_list = notify_list->next;
-        if (!irqs_disabled) _kernel_irqs_on();
-        device_notify_announce(item->device, 1);
-        free(item);
-    }
-    return NULL;
+  UNUSED(r);
+  dprintf(("", "announce callback handler\n"));
+
+  if (notify_list) {
+    int irqs_disabled = _kernel_irqs_disabled();
+    struct notify_list_s *item = 0;
+    if (!irqs_disabled) _kernel_irqs_off();
+    item = notify_list;
+    notify_list = notify_list->next;
+    if (!irqs_disabled) _kernel_irqs_on();
+
+    // Notify and free
+    device_notify_announce(item->device, 1);
+    free(item);
+
+    // Add a callback for the next item
+    _swix(OS_AddCallBack, _INR(0,1), AnnounceCallback_Entry, pw);
+  }
+
+  return NULL;
 }
 
 /*******************************************************************
@@ -82,7 +100,6 @@ int devices_final(void)
 {
     device_t *device = devices;
 
-    /* clean up all the devices */
     while (device)
     {
         device_t *next = device->next;
@@ -105,7 +122,17 @@ int devices_register(device_t *device, void *pw)
     int irqs_disabled;
     struct notify_list_s *item = 0;
 
-    device->device_id = next_id++;
+    irqs_disabled = _kernel_irqs_disabled();
+    if (!irqs_disabled) _kernel_irqs_off();
+    device->id = next_id++;
+    if (!irqs_disabled) _kernel_irqs_on();
+
+    dprintf(("", "registering device '%s' as device %lu [code:%p ws:%p ref:%p]\n",
+                 device->info.description, device->id,
+                 device->driver_code, device->driver_ws, device->driver_ref));
+
+    irqs_disabled = _kernel_irqs_disabled();
+    if (!irqs_disabled) _kernel_irqs_off();
     /* FIXME: If we've wrapped, this is not sufficient; we need to find a gap.
      *        this case is unlikely so I don't care for now.
      */
@@ -123,11 +150,6 @@ int devices_register(device_t *device, void *pw)
         last->next = device;
     }
 
-    irqs_disabled = _kernel_irqs_disabled();
-
-    // Turn IRQs off, just in case
-    if (!irqs_disabled) _kernel_irqs_off();
-
     item = malloc(sizeof(struct notify_list_s));
     item->device = device;
     item->next = 0;
@@ -135,7 +157,7 @@ int devices_register(device_t *device, void *pw)
     if (notify_list) {
         // Add to the list
         struct notify_list_s *last = notify_list;
-        while (last->next) last= last->next;
+        while (last->next) last = last->next;
         last->next = item;
     } else {
         // New list, add the callback
@@ -144,11 +166,9 @@ int devices_register(device_t *device, void *pw)
 
     }
 
-    // Turn them back on if we turned them off
     if (!irqs_disabled) _kernel_irqs_on();
     return 0;
 }
-
 
 /*******************************************************************
  Function:      devices_deregister
@@ -161,7 +181,7 @@ int devices_deregister(int device_id)
     device_t *cur = devices;
     device_t *last = 0;
 
-    while (cur && cur->device_id != device_id)
+    while (cur && cur->id != device_id)
     {
         last = cur;
         cur = cur->next;
@@ -190,7 +210,6 @@ int devices_deregister(int device_id)
     return 0;
 }
 
-
 /*******************************************************************
  Function:      devices_rescan
  Description:   Announce the device as being removed and then returning
@@ -204,7 +223,7 @@ int devices_rescan(int device_id)
     int rv = 1;
 
     while (device) {
-      if (device->device_id == device_id) {
+      if (device->id == device_id) {
         device_notify_announce(device, 0);
         device_notify_announce(device, 1);
         rv = 0;
@@ -221,7 +240,6 @@ int devices_rescan(int device_id)
     return 0;
 }
 
-
 /*******************************************************************
  Function:      devices_finddevice
  Description:   Find a device given the device_id
@@ -234,25 +252,24 @@ device_t *devices_find(int device_id)
     device_t *cur;
 
     for (cur=devices;
-         cur && cur->device_id != device_id;
+         cur && cur->id != device_id;
          cur=cur->next)
         ; /* Search is in the for loop */
 
     return cur;
 }
 
-
 /*******************************************************************
- Function:      devices_after
- Description:   Find the device AFTER the given one
- Parameters:    device -> device to find the one after, or NULL
-                to find first device.
- Returns:       pointer to the next device,
-                NULL if no more device found
+ Function:      devices_finddevice_after
+ Description:   Find a device AFTER a given the device_id
+ Parameters:    device_id = device id to find the device after, or 0
+                for the first one
+ Returns:       pointer to the next device, if found
+                NULL if no more devices found
  ******************************************************************/
 device_t *devices_after(device_t *device)
 {
-    unsigned long device_id = device ? device->device_id : 0;
+    unsigned long device_id = device ? device->id : 0;
     device_t *cur;
 
     for (cur=devices;
@@ -262,7 +279,7 @@ device_t *devices_after(device_t *device)
         if (device_id == 0)
             break;
 
-        if (cur->device_id == device_id)
+        if (cur->id == device_id)
             device_id = 0;
     }
 
