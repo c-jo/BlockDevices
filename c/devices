@@ -12,8 +12,11 @@
 
 #include "swis.h"
 
+#ifndef PYRO
 #include "DebugLib/DebugLib.h"
-
+#else
+#define dprintf(X) ;
+#endif
 #include "BlockDevicesHdr.h"
 
 #define UNUSED(x) (void)x;

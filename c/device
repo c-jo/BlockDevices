@@ -17,7 +17,11 @@
 #include "devices.h"
 #include "str.h"
 
+#ifndef PYRO
 #include "DebugLib/DebugLib.h"
+#else
+#define dprintf(X) ;
+#endif
 
 #include <stdio.h>
 
@@ -37,6 +41,7 @@ static struct name_counter_s {
 static char *device_name(const device_info_t *info)
 {
     int sequence_number = info->device_index;
+    char *name = NULL;
 
     if (!info || !info->name)
         return NULL;
@@ -76,7 +81,7 @@ static char *device_name(const device_info_t *info)
       sequence_number = counter_entry->counter++;
     }
 
-    char *name = malloc(strlen(info->name) + 16);
+    name = malloc(strlen(info->name) + 16);
 
     /* Generate the device name */
     if (name) {
@@ -101,11 +106,13 @@ device_t *device_create(
               void          *driver_ws,
               void          *driver_ref)
 {
-    device_t *device = calloc(1, sizeof(*device));
+    device_t *device, *parent;
+
+    device = calloc(1, sizeof(*device));
     if (device == NULL)
         return NULL;
 
-    device_t *parent = devices_find(info->parent_device);
+    parent = devices_find(info->parent_device);
 
     dprintf(("", "creating device '%s' (parent: %d [%p])\n",
                  info->description, info->parent_device, (void*)parent));

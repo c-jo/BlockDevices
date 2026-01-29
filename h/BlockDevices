@@ -144,6 +144,7 @@ typedef struct smart_attribute_header_s {
   unsigned attribute_type:8;
   unsigned attribute_id:16;
 } smart_attribute_header_t;
+
 /* Status */
 #define BlockDevice_SMART_Attribute_Status_OK       0x00
 #define BlockDevice_SMART_Attribute_Status_Warning  0x01
@@ -170,8 +171,8 @@ typedef enum {
   BlockDevice_SelfTest_Long       = 2,
   BlockDevice_SelfTest_Conveyance = 3,
   BlockDevice_SelfTest_Extended   = 4,
-  BlockDevice_SelfTest_Abort      = -1,
-} test_type_t;
+  BlockDevice_SelfTest_Abort      = -1
+} self_test_type_t;
 
 /* Self-test log
  * Entry: R2 -> buffer for log entries
@@ -179,22 +180,25 @@ typedef enum {
  */
 #define BlockDevice_DeviceOp_SelfTestLog 0x6
 /* Log item */
-typedef __packed struct self_test_result_s {
-  uint8_t          status;       // Status
-  uint8_t          reason;       // Failure/Abort Reason
-  uint8_t          percentage;   // Percentage complete
-  uint8_t          segment;      // Segment
-  test_type_t      test_type;    // Type of test
-  interface_type_t if_type;      // Interface type
-  uint64_t         test_time;    // Time of test (0xffffffffffffffff if NA)
-  uint64_t         fail_lba;     // Failing LBA  (0xffffffffffffffff if NA)
-  uint32_t         reserved[6];  //
+typedef enum {
+  BlockDevice_SelfTest_Status_Completed = 0,
+  BlockDevice_SelfTest_Status_Failed    = 1,
+  BlockDevice_SelfTest_Status_Aborted   = 2,
+  BlockDevice_SelfTest_Status_Running   = -2,
+  BlockDevice_SelfTest_Status_Unknown   = -1
+} self_test_result_status_t;
+
+typedef struct self_test_result_s {
+  self_test_result_status_t status;       // Status
+  unsigned                  reason;       // Failure/Abort Reason
+  unsigned                  percentage;   // Percentage complete
+  unsigned                  segment;      // Segment
+  self_test_type_t          test_type;    // Type of test
+  interface_type_t          if_type;      // Interface type
+  UINT64                    test_time;    // Time of test (0xffffffffffffffff if NA)
+  UINT64                    fail_lba;     // Failing LBA  (0xffffffffffffffff if NA)
+  unsigned                  reserved[6];  //
 } self_test_result_t;
-#define BlockDevice_SelfTest_Status_Completed  0x00
-#define BlockDevice_SelfTest_Status_Failed     0x01
-#define BlockDevice_SelfTest_Status_Aborted    0x02
-#define BlockDevice_SelfTest_Status_Running    0x80
-#define BlockDevice_SelfTest_Status_Unknown    0xff
 
 /* Read partititon info
  * Entry: None
@@ -217,8 +221,8 @@ typedef __packed struct self_test_result_s {
 
 /* TRIM */
 typedef struct trim_request_s {
-  uint64_t start_lba; // Starting LBA
-  uint32_t count;     // Number of blocks to trim
+  UINT64   start_lba; // Starting LBA
+  unsigned count;     // Number of blocks to trim
 } trim_request_t;
 
 /*******************************************************************

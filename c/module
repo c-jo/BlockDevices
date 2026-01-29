@@ -14,8 +14,13 @@
 #include "commands.h"
 #include "devices.h"
 
+#ifdef PYRO
+#define dprintf(X) ;
+#define Service_ShutDownComplete 1234
+#else
 #include "Global/Services.h"
 #include "DebugLib/DebugLib.h"
+#endif
 
 #define UNUSED(x) (void)x;
 
@@ -58,6 +63,7 @@ _kernel_oserror *Mod_Init(const char *tail, int podule_base, void *pw)
     UNUSED(tail)
     UNUSED(podule_base)
 
+#ifdef DEBUG
     /* set up debugging */
 //    debug_initialise(Module_Title, "<BlockDevices$DebugLog>", "");
     debug_initialise(Module_Title, "RAM::RamDisc0.$.BlockDevicesDebug", "");
@@ -65,6 +71,7 @@ _kernel_oserror *Mod_Init(const char *tail, int podule_base, void *pw)
     //debug_set_device(HAL_OUTPUT);
     debug_set_device(PRINTF_OUTPUT);
     debug_set_stamp_debug(FALSE);
+#endif
 
     running = 0;
 
@@ -199,10 +206,10 @@ _kernel_oserror *Mod_Command(const char *arg_string, int argc, int number,
  ******************************************************************/
 _kernel_oserror *SWI_Enumerate(int number, _kernel_swi_regs *r, void *pw)
 {
+    device_t *device = devices_after(devices_find(r->r[0]));
+
     UNUSED(number);
     UNUSED(pw);
-
-    device_t *device = devices_after(devices_find(r->r[0]));
 
     if (device == NULL)
     {
@@ -232,10 +239,10 @@ _kernel_oserror *SWI_Enumerate(int number, _kernel_swi_regs *r, void *pw)
  ******************************************************************/
 _kernel_oserror *SWI_EnumerateChildren(int number, _kernel_swi_regs *r, void *pw)
 {
+    device_t *device = devices_find(r->r[0]);
+
     UNUSED(number);
     UNUSED(pw);
-
-    device_t *device = devices_find(r->r[0]);
 
     do {
       device = devices_after(device);
@@ -266,10 +273,11 @@ _kernel_oserror *SWI_EnumerateChildren(int number, _kernel_swi_regs *r, void *pw
  ******************************************************************/
 _kernel_oserror *SWI_Info(int number, _kernel_swi_regs *r, void *pw)
 {
+    device_t *device = devices_find(r->r[0]);
+
     UNUSED(number);
     UNUSED(pw);
-
-    device_t *device = devices_find(r->r[0]);
+ 
     if (device == NULL)
         return err_BadDevice;
 
@@ -291,10 +299,11 @@ _kernel_oserror *SWI_Info(int number, _kernel_swi_regs *r, void *pw)
  ******************************************************************/
 _kernel_oserror *SWI_Read(int number, _kernel_swi_regs *r, void *pw)
 {
+    device_t *device = devices_find(r->r[0]);
+
     UNUSED(number);
     UNUSED(pw);
 
-    device_t *device = devices_find(r->r[0]);
     if (device == NULL)
         return err_BadDevice;
 
@@ -318,10 +327,11 @@ _kernel_oserror *SWI_Read(int number, _kernel_swi_regs *r, void *pw)
  ******************************************************************/
 _kernel_oserror *SWI_Write(int number, _kernel_swi_regs *r, void *pw)
 {
+    device_t *device = devices_find(r->r[0]);
+
     UNUSED(number);
     UNUSED(pw);
 
-    device_t *device = devices_find(r->r[0]);
     if (device == NULL)
         return err_BadDevice;
 
@@ -345,10 +355,11 @@ _kernel_oserror *SWI_Write(int number, _kernel_swi_regs *r, void *pw)
  ******************************************************************/
 _kernel_oserror *SWI_Verify(int number, _kernel_swi_regs *r, void *pw)
 {
+    device_t *device = devices_find(r->r[0]);
+
     UNUSED(number);
     UNUSED(pw);
 
-    device_t *device = devices_find(r->r[0]);
     if (device == NULL)
         return err_BadDevice;
 
@@ -372,10 +383,11 @@ _kernel_oserror *SWI_Verify(int number, _kernel_swi_regs *r, void *pw)
  ******************************************************************/
 _kernel_oserror *SWI_DeviceOp(int number, _kernel_swi_regs *r, void *pw)
 {
+    device_t *device = devices_find(r->r[0]);
+
     UNUSED(number);
     UNUSED(pw);
 
-    device_t *device = devices_find(r->r[0]);
     if (device == NULL)
         return err_BadDevice;
 
@@ -398,10 +410,11 @@ _kernel_oserror *SWI_DeviceOp(int number, _kernel_swi_regs *r, void *pw)
  ******************************************************************/
 _kernel_oserror *SWI_MediaOp(int number, _kernel_swi_regs *r, void *pw)
 {
+    device_t *device = devices_find(r->r[0]);
+ 
     UNUSED(number);
     UNUSED(pw);
 
-    device_t *device = devices_find(r->r[0]);
     if (device == NULL)
         return err_BadDevice;
 
@@ -424,10 +437,11 @@ _kernel_oserror *SWI_MediaOp(int number, _kernel_swi_regs *r, void *pw)
  ******************************************************************/
 _kernel_oserror *SWI_SecurityOp(int number, _kernel_swi_regs *r, void *pw)
 {
+    device_t *device = devices_find(r->r[0]);
+
     UNUSED(number);
     UNUSED(pw);
 
-    device_t *device = devices_find(r->r[0]);
     if (device == NULL)
         return err_BadDevice;
 
@@ -450,10 +464,11 @@ _kernel_oserror *SWI_SecurityOp(int number, _kernel_swi_regs *r, void *pw)
  ******************************************************************/
 _kernel_oserror *SWI_SectorOp(int number, _kernel_swi_regs *r, void *pw)
 {
+    device_t *device = devices_find(r->r[0]);
+
     UNUSED(number);
     UNUSED(pw);
 
-    device_t *device = devices_find(r->r[0]);
     if (device == NULL)
         return err_BadDevice;
 
@@ -476,10 +491,11 @@ _kernel_oserror *SWI_SectorOp(int number, _kernel_swi_regs *r, void *pw)
  ******************************************************************/
 _kernel_oserror *SWI_DriverOp(int number, _kernel_swi_regs *r, void *pw)
 {
+    device_t *device = devices_find(r->r[0]);
+
     UNUSED(number);
     UNUSED(pw);
 
-    device_t *device = devices_find(r->r[0]);
     if (device == NULL)
         return err_BadDevice;
 
@@ -506,13 +522,13 @@ _kernel_oserror *SWI_DriverOp(int number, _kernel_swi_regs *r, void *pw)
  ******************************************************************/
 _kernel_oserror *SWI_Register(int number, _kernel_swi_regs *r, void *pw)
 {
-    UNUSED(number);
-
     device_info_t *info = (device_info_t *)r->r[1];
     void *driver_code = (void *)r->r[2];
     void *driver_ws   = (void *)r->r[3];
     void *driver_ref  = (void *)r->r[4];
     device_t *dev;
+
+    UNUSED(number);
 
     if (!running) return err_Starting;
 
@@ -549,10 +565,10 @@ _kernel_oserror *SWI_Register(int number, _kernel_swi_regs *r, void *pw)
  ******************************************************************/
 _kernel_oserror *SWI_Deregister(int number, _kernel_swi_regs *r, void *pw)
 {
+    int device_id = r->r[0];
+
     UNUSED(number);
     UNUSED(pw);
-
-    int device_id = r->r[0];
 
     if (!running) return err_Starting;
 
@@ -576,10 +592,10 @@ Description:    Recans a device.
  ******************************************************************/
 _kernel_oserror *SWI_Rescan(int number, _kernel_swi_regs *r, void *pw)
 {
+    int device_id = r->r[0];
+
     UNUSED(number);
     UNUSED(pw);
-
-    int device_id = r->r[0];
 
     if (!running) return err_Starting;
 

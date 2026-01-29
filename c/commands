@@ -15,7 +15,11 @@
 #include "devices.h"
 #include "str.h"
 
+#ifndef PYRO
 #include "DebugLib/DebugLib.h"
+#else
+#define dprintf(X) ;
+#endif
 
 #define UNUSED(x) (void)x
 
@@ -79,8 +83,16 @@ static idmessages_t device_type_names[] = {
  ******************************************************************/
 static char *unit_names[] = { "B", "KB", "MB", "GB", "TB" };
 
-static void format_capacity(UINT64 block_count, unsigned block_size, char *buffer)
+#ifdef PYRO
+#define BLOCK_COUNT unsigned
+#else
+#define BLOCK_COUNT uint64_t
+#endif
+static void format_capacity(BLOCK_COUNT block_count, unsigned block_size, char *buffer)
 {
+    unsigned long units = 0;
+    double value = block_count;
+
     if (block_count == 0 || block_size == 0)
     {
       *buffer++ = '-';
@@ -88,10 +100,6 @@ static void format_capacity(UINT64 block_count, unsigned block_size, char *buffe
       return;
     }
 
-    unsigned long units = 0;
-    double value;
-//    LL_L2UI(count, block_count);
-    value = block_count;
     value = value * block_size;
 
     while (value > 9999 && units < 5) {
@@ -165,13 +173,17 @@ static void populate_device_table(device_t *device, int indent, char **table, in
 {
     char capacity[16];
     char id[64];
+    device_t *child = NULL;
 
     dprintf(("", "populate_device_table(device %ld, row %d)\n", device->id, *row));
 
     format_id(device->id, id, indent);
 
+#ifdef PYRO
+    format_capacity(device->info.block_count.lo, device->info.block_size, capacity);
+#else
     format_capacity(device->info.block_count, device->info.block_size, capacity);
-
+#endif
     // Column 0: Device ID with indentation
     table[*row * 8 + 0] = strdup(id);
 
@@ -199,7 +211,6 @@ static void populate_device_table(device_t *device, int indent, char **table, in
     (*row)++;
 
     // Process children
-    device_t *child = NULL;
     for (child = 0; (child = devices_after(child)) != NULL; )
     {
         if (child->info.parent_device == device->id)
@@ -221,8 +232,9 @@ static void populate_device_table(device_t *device, int indent, char **table, in
  ******************************************************************/
 static void calculate_column_widths(char **table, int rows, int cols, char **headers, int *widths)
 {
-    dprintf(("", "Calculating column width\n"));
     int row, col;
+
+    dprintf(("", "Calculating column width\n"));
 
     // Initialize widths to that of the headers
     for (col = 0; col < cols; col++)
@@ -255,14 +267,16 @@ _kernel_oserror *Cmd_BlockDevices(void)
 {
     device_t *device = NULL;
     int device_count = count_devices();
-    dprintf(("", "Got %d devices\n", device_count));
     int i, row = 0;
     int col_width[8];
     char *header[8] = { "Device", "Name", "Description",
                         "Type", "I/F.", "Con.", "Media", "Capacity" };
+    char **table;
+
+    dprintf(("", "Got %d devices\n", device_count));
 
     // Allocate table: device_count rows x 8 columns
-    char **table = (char **)malloc(device_count * 8 * sizeof(char *));
+    table = (char **)malloc(device_count * 8 * sizeof(char *));
     if (table == NULL)
     {
         return NULL;
@@ -326,23 +340,35 @@ _kernel_oserror *Cmd_BlockDevices(void)
  ******************************************************************/
 _kernel_oserror *Cmd_BlockDeviceInfo(const char *arg_string, int argc)
 {
-    UNUSED(argc);
     device_t *device=devices_find(atoi(arg_string));
+    char capacity[16];
+
+    UNUSED(argc);
 
     if (device == NULL)
     {
         return err_BadDevice;
     }
 
-    char capacity[16];
+#ifdef PYRO
+    format_capacity(device->info.block_count.lo, device->info.block_size, capacity);
+#else
     format_capacity(device->info.block_count, device->info.block_size, capacity);
+#endif
 
     printf("Device %d information:\n", (int)device->id);
     printf("  Description: %s\n", device->info.description ? device->info.description : "Unknown");
+#ifdef PYRO
+    printf("  Size:        %lu blocks of %d bytes (%s)\n",
+        device->info.block_count.lo,
+        device->info.block_size,
+        capacity);
+#else
     printf("  Size:        %llu blocks of %d bytes (%s)\n",
         (unsigned long long)device->info.block_count,
         device->info.block_size,
         capacity);
+#endif
     printf("  Device type: %s\n",
         lookup(device->info.device_type, device_type_names));
     printf("  Interface:   %s (%s)\n",

@@ -2,7 +2,11 @@
 
 #include "VersionNum"
 #include "BlockDevices.h"
+#ifndef PYRO
 #include "Global/Services.h"
+#else
+#define Service_ShutDownComplete 123
+#endif
 
 ; You should give your module a sensible name which describes its purpose
 ; both accurately and concisely.
@@ -180,6 +184,3 @@ add-syntax:)
 ; handle.
 service-call-handler: Mod_Service \
   Service_ShutDownComplete
-; Service_BlockDevices_Dying \
-; Service_BlockDevices_DeviceAdded \
-; Service_BlockDevices_DeviceRemoved
