@@ -115,55 +115,56 @@ typedef struct transfer_block_s {
 #define BlockDevices_Reason_SectorOp    7
 #define BlockDevices_Reason_DriverOp    8
 
-/*
+/*******************************************************************
  * DeviceOps
+ ******************************************************************/
+
+/* Get serial, model or firmware.
+ * Entry: None
+ * Exit:  R0 -> Requested string
  */
-#define BlockDevice_DeviceOp_SerialNumber  1
-#define BlockDevice_DeviceOp_ModelName     2
-#define BlockDevice_DeviceOp_Firmware      3
-#define BlockDevice_DeviceOp_SMART         4
-#define BlockDevice_DeviceOp_PartitionInfo 5
-#define BlockDevice_DeviceOp_SelfTestLog   6
-#define BlockDevice_DeviceOp_SelfTest      7
+#define BlockDevice_DeviceOp_SerialNumber 0x1
+#define BlockDevice_DeviceOp_ModelName    0x2
+#define BlockDevice_DeviceOp_Firmware     0x3
 
-/* SMART */
-#define BlockDevice_DeviceOp_SMART_Flag_Raw 0x01
-
+/* Read SMART status
+ * Entry: R3 -> buffer for results
+ *        R4  = size of buffer (in bytes)
+ * Exit:  R4  = size of returned data
+          R5  = number of items in data
+ */
+#define BlockDevice_DeviceOp_SMART 0x4
+/* SMART Attribute Header - followed by value of value_size, and threshold
+ * and critical, if present. */
 typedef struct smart_attribute_header_s {
   unsigned status:8;
   unsigned flags:16;
-  unsigned value_size:8;
+  unsigned value_size:8; // bytes
   unsigned reserved:8;
   unsigned attribute_type:8;
   unsigned attribute_id:16;
 } smart_attribute_header_t;
-
+/* Status */
 #define BlockDevice_SMART_Attribute_Status_OK       0x00
 #define BlockDevice_SMART_Attribute_Status_Warning  0x01
 #define BlockDevice_SMART_Attribute_Status_Critical 0x02
 #define BlockDevice_SMART_Attribute_Status_Failure  0x03
-
+/* Flags */
 #define BlockDevice_SMART_Attribute_Flags_Threshold_Present 1
 #define BlockDevice_SMART_Attribute_Flags_Critical_Present  2
 #define BlockDevice_SMART_Attribute_Flags_Higher_Is_Better  4 // Setting both
 #define BlockDevice_SMART_Attribute_Flags_Lower_Is_Better   8 // is undefined
-
+/* Types */
 #define BlockDevice_SMART_Attribute_Type_General 0x00
 #define BlockDevice_SMART_Attribute_Type_IDE     0x01
 #define BlockDevice_SMART_Attribute_Type_SCSI    0x02
 #define BlockDevice_SMART_Attribute_Type_NVMe    0x03
 
-/* Partition Types */
-#define BlockDevice_PartitionType_MBR 1
-#define BlockDevice_PartitionType_GPT 2
-
-/* Self-Test */
-#define BlockDevice_SelfTest_Status_Completed  0x00
-#define BlockDevice_SelfTest_Status_Failed     0x01
-#define BlockDevice_SelfTest_Status_Aborted    0x02
-#define BlockDevice_SelfTest_Status_Running    0x80
-#define BlockDevice_SelfTest_Status_Unknown    0xff
-
+/* Self-test
+ * Entry: R2 = Test type
+ */
+#define BlockDevice_DeviceOp_SelfTest 0x5
+/* Test types */
 typedef enum {
   BlockDevice_SelfTest_Short      = 1,
   BlockDevice_SelfTest_Long       = 2,
@@ -172,6 +173,12 @@ typedef enum {
   BlockDevice_SelfTest_Abort      = -1,
 } test_type_t;
 
+/* Self-test log
+ * Entry: R2 -> buffer for log entries
+ *        R3 =  number of items to get
+ */
+#define BlockDevice_DeviceOp_SelfTestLog 0x6
+/* Log item */
 typedef __packed struct self_test_result_s {
   uint8_t          status;       // Status
   uint8_t          reason;       // Failure/Abort Reason
@@ -183,13 +190,30 @@ typedef __packed struct self_test_result_s {
   uint64_t         fail_lba;     // Failing LBA  (0xffffffffffffffff if NA)
   uint32_t         reserved[6];  //
 } self_test_result_t;
+#define BlockDevice_SelfTest_Status_Completed  0x00
+#define BlockDevice_SelfTest_Status_Failed     0x01
+#define BlockDevice_SelfTest_Status_Aborted    0x02
+#define BlockDevice_SelfTest_Status_Running    0x80
+#define BlockDevice_SelfTest_Status_Unknown    0xff
 
-#define BlockDevice_DeviceOp_SelfTestLog_Flag_Raw 0x1
-
-/*
- * SectorOps
+/* Read partititon info
+ * Entry: None
+ * Exit:  R0 = Partition Type
+ *          MBR:
+ *            R1  = partition type
+ *          GPT:
+ *            R1 -> type GUID
+ *            R2 -> partition GUID
  */
-#define BlockDevice_SectorOp_TRIM 1
+#define BlockDevice_DeviceOp_PartitionInfo 0x7
+/* Partition Types */
+#define BlockDevice_PartitionType_MBR 1
+#define BlockDevice_PartitionType_GPT 2
+
+/*******************************************************************
+ * SectorOps
+ ******************************************************************/
+#define BlockDevice_SectorOp_TRIM 0x1
 
 /* TRIM */
 typedef struct trim_request_s {
@@ -197,12 +221,18 @@ typedef struct trim_request_s {
   uint32_t count;     // Number of blocks to trim
 } trim_request_t;
 
-/*
+/*******************************************************************
  * MediaOps
- */
-#define BlockDevice_MediaOp_BlockSizes   1
-#define BlockDevice_MediaOp_SetBlockSize 2
+ ******************************************************************/
 
+/* Get block sizes
+ * Entry: R2 -> Buffer for result
+ *        R3  = index (0 to start)
+ *        R4  = number of sizes to get
+ * Exit:  R3  = index for next call
+ *        R4  = number of sizes got
+ */
+#define BlockDevice_MediaOp_BlockSizes 0x2
 /* BlockSizes */
 typedef struct block_size_s {
   unsigned size;         // Block size, in bytes
@@ -213,10 +243,14 @@ typedef struct block_size_s {
   } priority;
 } block_size_t;
 
-/*
- * SecurityOps
+/* Set block size
+ * Entry: R2 = new block size (in bytes)
  */
+#define BlockDevice_MediaOp_SetBlockSize 0x3
 
+/*******************************************************************
+ * SecurityOps
+ ******************************************************************/
 #endif
 
 // Service calls

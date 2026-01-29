@@ -9,7 +9,6 @@
 
 #include "kernel.h"
 
-
 /*******************************************************************
  Function:      Cmd_BlockDevices
  Description:   Display information about the block devices

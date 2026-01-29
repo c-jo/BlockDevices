@@ -4,6 +4,6 @@
  *
  */
 
-#define Module_MajorVersion_CMHG        1.50
+#define Module_MajorVersion_CMHG        1.25
 #define Module_MinorVersion_CMHG
-#define Module_Date_CMHG                20 Jan 2026
+#define Module_Date_CMHG                25 Jan 2026
