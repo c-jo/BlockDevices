@@ -17,9 +17,11 @@
 #undef USE_LONG_LONG
 #include "longlong.h"
 #define UINT64 ulonglong_t
+#define BYTE unsigned char
 #else
 #include <stdint.h>
 #define UINT64 uint64_t
+#define BYTE uint8_t
 #endif
 
 // Invalid device id
@@ -35,7 +37,7 @@
 typedef UINT64 blockaddr_t;
 
 // Device Types
-typedef enum device_type_e {
+typedef enum {
   BlockDevice_DeviceType_Unknown    = 0,
   BlockDevice_DeviceType_Controller = 1,
   BlockDevice_DeviceType_Drive      = 2,
@@ -46,7 +48,7 @@ typedef enum device_type_e {
 } device_type_t;
 
 // Interface Types
-typedef enum interface_type_e {
+typedef enum {
     BlockDevice_InterfaceType_Unknown = 0,
     BlockDevice_InterfaceType_FDC     = 1,
     BlockDevice_InterfaceType_ST506   = 2,
@@ -59,7 +61,7 @@ typedef enum interface_type_e {
 } interface_type_t;
 
 // Connection Types
-typedef enum interface_connection_type_e {
+typedef enum {
     BlockDevice_ConnectionType_Unknown     = 0,
     BlockDevice_ConnectionType_Motherboard = 1,
     BlockDevice_ConnectionType_Podule      = 2,
@@ -71,7 +73,7 @@ typedef enum interface_connection_type_e {
 } connection_type_t;
 
 // Media Types
-typedef enum media_type_e {
+typedef enum {
     BlockDevice_MediaType_Unknown  = 0,
     BlockDevice_MediaType_Floppy   = 1,
     BlockDevice_MediaType_HardDisc = 2,
@@ -128,38 +130,51 @@ typedef struct transfer_block_s {
 #define BlockDevice_DeviceOp_Firmware     0x3
 
 /* Read SMART status
- * Entry: R3 -> buffer for results
- *        R4  = size of buffer (in bytes)
- * Exit:  R4  = size of returned data
-          R5  = number of items in data
+ * Entry: R2 -> buffer for results
+ *        R3  = size of buffer (in entries)
+ *              or pass R3,R4 = 0 to get the size needed
+ * Exit:  R3  = number of items returned
+ * If the passed buffer isn't large enough, R3 will be set to the
+ * required size, and an error genrated (unless R2 is NULL)
  */
 #define BlockDevice_DeviceOp_SMART 0x4
-/* SMART Attribute Header - followed by value of value_size, and threshold
- * and critical, if present. */
-typedef struct smart_attribute_header_s {
-  unsigned status:8;
-  unsigned flags:16;
-  unsigned value_size:8; // bytes
-  unsigned reserved:8;
-  unsigned attribute_type:8;
-  unsigned attribute_id:16;
-} smart_attribute_header_t;
-
-/* Status */
-#define BlockDevice_SMART_Attribute_Status_OK       0x00
-#define BlockDevice_SMART_Attribute_Status_Warning  0x01
-#define BlockDevice_SMART_Attribute_Status_Critical 0x02
-#define BlockDevice_SMART_Attribute_Status_Failure  0x03
+typedef enum {
+    BlockDevice_SMART_Status_OK       = 0,
+    BlockDevice_SMART_Status_Warning  = 1,
+    BlockDevice_SMART_Status_Critical = 2,
+    BlockDevice_SMART_Status_Failure  = 3,
+    BlockDevice_SMART_Status_Unknown  = -1
+} smart_status_t;
 /* Flags */
-#define BlockDevice_SMART_Attribute_Flags_Threshold_Present 1
-#define BlockDevice_SMART_Attribute_Flags_Critical_Present  2
-#define BlockDevice_SMART_Attribute_Flags_Higher_Is_Better  4 // Setting both
-#define BlockDevice_SMART_Attribute_Flags_Lower_Is_Better   8 // is undefined
-/* Types */
-#define BlockDevice_SMART_Attribute_Type_General 0x00
-#define BlockDevice_SMART_Attribute_Type_IDE     0x01
-#define BlockDevice_SMART_Attribute_Type_SCSI    0x02
-#define BlockDevice_SMART_Attribute_Type_NVMe    0x03
+#define BlockDevice_SMART_Flags_DataSize_Mask     0x3
+#define BlockDevice_SMART_Flags_DataSize_64       0x2
+#define BlockDevice_SMART_Flags_DataSize_128      0x3
+#define BlockDevice_SMART_Flags_Higher_Is_Better  0x4 // Setting both
+#define BlockDevice_SMART_Flags_Lower_Is_Better   0x8 // is undefined
+
+typedef enum {
+    BlockDevice_SMART_Type_General = 0,
+    BlockDevice_SMART_Type_IDE     = 1,
+    BlockDevice_SMART_Type_SCSI    = 2,
+    BlockDevice_SMART_Type_NVMe    = 3
+} smart_type_t;
+
+typedef struct {
+  smart_status_t status;
+  unsigned       flags;
+  smart_type_t   type;
+  unsigned       id;
+  union {
+    UINT64       value64;     // Data Size = 2
+    BYTE         data[16];    // Data Size = 3
+    struct {
+      unsigned   value;       // Data Size = 0
+      unsigned   threshold;
+      unsigned   critical;
+      unsigned   spare;
+    };
+  };
+} smart_attribute_t;
 
 /* Self-test
  * Entry: R2 = Test type
@@ -195,24 +210,26 @@ typedef struct self_test_result_s {
   unsigned                  segment;      // Segment
   self_test_type_t          test_type;    // Type of test
   interface_type_t          if_type;      // Interface type
-  UINT64                    test_time;    // Time of test (0xffffffffffffffff if NA)
-  UINT64                    fail_lba;     // Failing LBA  (0xffffffffffffffff if NA)
+  UINT64                    test_time;    // Time of test (all bits set for NA)
+  UINT64                    fail_lba;     // Failing LBA (all bits set for NA)
   unsigned                  reserved[6];  //
 } self_test_result_t;
 
 /* Read partititon info
  * Entry: None
- * Exit:  R0 = Partition Type
+ * Exit:  R0 = Partition scheme
  *          MBR:
- *            R1  = partition type
+ *            R1  = Type
  *          GPT:
  *            R1 -> type GUID
  *            R2 -> partition GUID
  */
 #define BlockDevice_DeviceOp_PartitionInfo 0x7
-/* Partition Types */
-#define BlockDevice_PartitionType_MBR 1
-#define BlockDevice_PartitionType_GPT 2
+/* Partition Schemes */
+typedef enum {
+  BlockDevice_PartitionScheme_MBR = 1,
+  BlockDevice_PartitionScheme_GPT = 2
+} partiton_scheme_t;
 
 /*******************************************************************
  * SectorOps
