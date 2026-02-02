@@ -359,7 +359,7 @@ _kernel_oserror *Cmd_BlockDeviceInfo(const char *arg_string, int argc)
     printf("Device %d information:\n", (int)device->id);
     printf("  Description: %s\n", device->info.description ? device->info.description : "Unknown");
 #ifdef PYRO
-    printf("  Size:        %lu blocks of %d bytes (%s)\n",
+    printf("  Size:        %u blocks of %d bytes (%s)\n",
         device->info.block_count.lo,
         device->info.block_size,
         capacity);

@@ -166,14 +166,14 @@ typedef struct {
   unsigned       id;
   union {
     UINT64       value64;     // Data Size = 2
-    BYTE         data[16];    // Data Size = 3
+    BYTE         value128;    // Data Size = 3
     struct {
       unsigned   value;       // Data Size = 0
       unsigned   threshold;
       unsigned   critical;
       unsigned   spare;
-    };
-  };
+    } words;
+  } data;
 } smart_attribute_t;
 
 /* Self-test
