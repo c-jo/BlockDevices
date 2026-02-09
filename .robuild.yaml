@@ -61,10 +61,10 @@ jobs:
 
       - echo *** Copy artifacts ***
       - cdir Artifacts
-      - copy rm32.BlockDevices Artifacts.* ~CV
-      - copy rm.BlockDevices Artifacts.* ~CV
-      - copy aof32.BlockDevices Artifacts.* ~CV
-      - copy aof.BlockDevices Artifacts.* ~CV
+      - copy rm32 Artifacts.* ~CVR
+      - copy rm Artifacts.* ~CVR
+      - copy aof32 Artifacts.* ~CVR
+      - copy aof Artifacts.* ~CVR
       - cdir Artifacts.Lib
       - cdir Artifacts.Lib.h
       - copy <Exports$Dir>.C.h.BlockDevices Artifacts.Lib.h.BlockDevices ~CV
