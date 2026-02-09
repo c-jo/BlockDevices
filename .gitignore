@@ -3,3 +3,13 @@
 /h/BlockDevicesHdr
 /oz32
 /rm32
+.rotransform
+h/BlockDevicesHdr
+aof/*
+aof32/*
+oz/*
+oz32/*
+oz64/*
+rm/*
+rm32/*
+rm64/*
