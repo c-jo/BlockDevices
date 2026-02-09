@@ -29,7 +29,7 @@ jobs:
       # Header export
       - echo
       - echo *** Build the exports ***
-      - amu -f MakefilePyro ram
+      - amu -f MakefilePyro export
 
       # Build modules
       - echo
@@ -61,13 +61,13 @@ jobs:
 
       - echo *** Copy artifacts ***
       - cdir Artifacts
-      - copy BlockDevices.rm32.BlockDevices Artifacts.* ~CV
-      - copy BlockDevices.rm26.BlockDevices Artifacts.* ~CV
-      - copy BlockDevices.aof32.BlockDevices Artifacts.* ~CV
-      - copy BlockDevices.aof26.BlockDevices Artifacts.* ~CV
+      - copy rm32.BlockDevices Artifacts.* ~CV
+      - copy rm.BlockDevices Artifacts.* ~CV
+      - copy aof32.BlockDevices Artifacts.* ~CV
+      - copy aof.BlockDevices Artifacts.* ~CV
       - cdir Artifacts.Lib
       - cdir Artifacts.Lib.h
-      - copy <Export$Dir>.Lib.h.BlockDevices Artifacts.Lib.h.BlockDevices ~CV
+      - copy <Exports$Dir>.C.h.BlockDevices Artifacts.Lib.h.BlockDevices ~CV
       - copy LICENSE Artifacts.* ~CV
 
       - echo
