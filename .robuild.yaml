@@ -26,17 +26,49 @@ jobs:
     # The build will terminate if any command returns a non-0 return code or an error.
     script:
 
+      # Header export
       - echo
-      - echo *** Build the component ***
-      - amu -f MakefilePyro ram  
+      - echo *** Build the exports ***
+      - amu -f MakefilePyro ram
+
+      # Build modules
+      - echo
+      - echo *** Build the RAM module (32-bit) ***
+      - amu -f MakefilePyro ram
+
+      - echo
+      - echo *** Build the RAM module (26-bit) ***
+      - amu -f MakefilePyro ram BUILD26=1 BUILD32=
 
       - echo
       - echo *** Load the module ***
       - RMLoad rm32.BlockDevices
 
-      - echo
-      - echo *** Kill the module ***
+      # Simple tests
+      - echo *** Test BlockDevices command ***
+      - BlockDevices
+      - echo *** Killing the module should be safe ***
       - RMKill BlockDevices
+
+      # Build modules for ROM
+      - echo
+      - echo *** Build the ROM module (32-bit) ***
+      - amu -f MakefilePyro rom
+
+      - echo
+      - echo *** Build the ROM module (26-bit) ***
+      - amu -f MakefilePyro rom BUILD26=1 BUILD32=
+
+      - echo *** Copy artifacts ***
+      - cdir Artifacts
+      - copy BlockDevices.rm32.BlockDevices Artifacts.* ~CV
+      - copy BlockDevices.rm26.BlockDevices Artifacts.* ~CV
+      - copy BlockDevices.aof32.BlockDevices Artifacts.* ~CV
+      - copy BlockDevices.aof26.BlockDevices Artifacts.* ~CV
+      - cdir Artifacts.Lib
+      - cdir Artifacts.Lib.h
+      - copy <Export$Dir>.Lib.h.BlockDevices Artifacts.Lib.h.BlockDevices ~CV
+      - copy LICENSE Artifacts.* ~CV
 
       - echo
       - echo *** SUCCESS ***
@@ -47,4 +79,4 @@ jobs:
     artifacts:
       # Each element of the artifacts should have a path key, which gives the file or
       # directory to return.
-      - path: rm32
+      - path: Artifacts
