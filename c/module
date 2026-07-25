@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdint.h>
 
 #include "kernel.h"
 #include "swis.h"
@@ -218,7 +219,7 @@ _kernel_oserror *SWI_Enumerate(int number, _kernel_swi_regs *r, void *pw)
     else
     {
         r->r[0] = (int)device->id;
-        r->r[1] = (int)&device->info;
+        r->r[1] = (int)(intptr_t)&device->info;
     }
     return NULL;
 }
@@ -255,7 +256,7 @@ _kernel_oserror *SWI_EnumerateChildren(int number, _kernel_swi_regs *r, void *pw
     else
     {
         r->r[0] = (int)device->id;
-        r->r[1] = (int)&device->info;
+        r->r[1] = (int)(intptr_t)&device->info;
     }
     return NULL;
 }
@@ -281,7 +282,7 @@ _kernel_oserror *SWI_Info(int number, _kernel_swi_regs *r, void *pw)
     if (device == NULL)
         return err_BadDevice;
 
-    r->r[1] = (int)&device->info;
+    r->r[1] = (int)(intptr_t)&device->info;
     return NULL;
 }
 
@@ -309,8 +310,8 @@ _kernel_oserror *SWI_Read(int number, _kernel_swi_regs *r, void *pw)
 
     return device_transfer(device,
                            BlockDevices_Reason_Read,
-                           (unsigned long)r->r[1],
-                           (transfer_block_t*)r->r[2]);
+                           (uint32_t)r->r[1],
+                           (transfer_block_t*)(intptr_t)r->r[2]);
 }
 
 /*******************************************************************
@@ -337,8 +338,8 @@ _kernel_oserror *SWI_Write(int number, _kernel_swi_regs *r, void *pw)
 
     return device_transfer(device,
                            BlockDevices_Reason_Write,
-                           (unsigned long)r->r[1],
-                           (transfer_block_t*)r->r[2]);
+                           (uint32_t)r->r[1],
+                           (transfer_block_t*)(intptr_t)r->r[2]);
 }
 
 /*******************************************************************
@@ -365,8 +366,8 @@ _kernel_oserror *SWI_Verify(int number, _kernel_swi_regs *r, void *pw)
 
     return device_transfer(device,
                            BlockDevices_Reason_Verify,
-                           (unsigned long)r->r[1],
-                           (transfer_block_t*)r->r[2]);
+                           (uint32_t)r->r[1],
+                           (transfer_block_t*)(intptr_t)r->r[2]);
 }
 
 /*******************************************************************
@@ -522,10 +523,10 @@ _kernel_oserror *SWI_DriverOp(int number, _kernel_swi_regs *r, void *pw)
  ******************************************************************/
 _kernel_oserror *SWI_Register(int number, _kernel_swi_regs *r, void *pw)
 {
-    device_info_t *info = (device_info_t *)r->r[1];
-    void *driver_code = (void *)r->r[2];
-    void *driver_ws   = (void *)r->r[3];
-    void *driver_ref  = (void *)r->r[4];
+    device_info_t *info = (device_info_t *)(intptr_t)r->r[1];
+    void *driver_code = (void *)(intptr_t)r->r[2];
+    void *driver_ws   = (void *)(intptr_t)r->r[3];
+    void *driver_ref  = (void *)(intptr_t)r->r[4];
     device_t *dev;
 
     UNUSED(number);

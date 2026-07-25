@@ -1,13 +1,14 @@
 %YAML 1.0
 ---
 
-# RISC OS 32-bit module smoke test, executed on https://build.riscos.online/
-# with `riscos-build-online -A aarch32` (the default architecture).
+# RISC OS 64-bit module smoke test, executed on https://build.riscos.online/
+# with `riscos-build-online -A aarch64`.
 #
 # The module itself is built by .github/workflows/ci.yml, inside the
-# gerph/riscos-build container, using the local toolchain directly. This
-# file only RMLoads and exercises the pre-built rm32/BlockDevices module -
-# submit it alongside that file, not the source tree.
+# gerph/riscos-build container, using the local toolchain directly (the
+# aarch64 execution guest has no compiler). This file only RMLoads and
+# exercises the pre-built rm64/BlockDevices module - submit it alongside
+# that file, not the source tree.
 
 jobs:
   build:
@@ -17,7 +18,7 @@ jobs:
     script:
       - echo
       - echo *** Load the module ***
-      - RMLoad rm32.BlockDevices
+      - RMLoad rm64.BlockDevices
 
       - echo *** Test BlockDevices command ***
       - BlockDevices

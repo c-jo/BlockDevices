@@ -83,7 +83,7 @@ static idmessages_t device_type_names[] = {
  ******************************************************************/
 static char *unit_names[] = { "B", "KB", "MB", "GB", "TB" };
 
-#ifdef PYRO
+#ifdef USE_LONG_LONG
 #define BLOCK_COUNT unsigned
 #else
 #define BLOCK_COUNT uint64_t
@@ -179,7 +179,7 @@ static void populate_device_table(device_t *device, int indent, char **table, in
 
     format_id(device->id, id, indent);
 
-#ifdef PYRO
+#ifdef USE_LONG_LONG
     format_capacity(device->info.block_count.lo, device->info.block_size, capacity);
 #else
     format_capacity(device->info.block_count, device->info.block_size, capacity);
@@ -350,7 +350,7 @@ _kernel_oserror *Cmd_BlockDeviceInfo(const char *arg_string, int argc)
         return err_BadDevice;
     }
 
-#ifdef PYRO
+#ifdef USE_LONG_LONG
     format_capacity(device->info.block_count.lo, device->info.block_size, capacity);
 #else
     format_capacity(device->info.block_count, device->info.block_size, capacity);
@@ -358,7 +358,7 @@ _kernel_oserror *Cmd_BlockDeviceInfo(const char *arg_string, int argc)
 
     printf("Device %d information:\n", (int)device->id);
     printf("  Description: %s\n", device->info.description ? device->info.description : "Unknown");
-#ifdef PYRO
+#ifdef USE_LONG_LONG
     printf("  Size:        %u blocks of %d bytes (%s)\n",
         device->info.block_count.lo,
         device->info.block_size,

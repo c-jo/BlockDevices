@@ -6,6 +6,8 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+#include <stdint.h>
 
 #include "callx.h"
 #ifdef FORTIFY
@@ -22,8 +24,6 @@
 #else
 #define dprintf(X) ;
 #endif
-
-#include <stdio.h>
 
 static struct name_counter_s {
     char *base_name;
@@ -250,7 +250,7 @@ void device_destroy(device_t *device)
  Returns:       pointer to an error block if failed
                 NULL if successful
  ******************************************************************/
-_kernel_oserror * device_transfer(device_t *device, unsigned int entry, unsigned long flags, transfer_block_t *block)
+_kernel_oserror * device_transfer(device_t *device, unsigned int entry, uint32_t flags, transfer_block_t *block)
 {
     _kernel_oserror *err;
 

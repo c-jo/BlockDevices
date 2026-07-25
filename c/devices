@@ -21,6 +21,32 @@
 
 #define UNUSED(x) (void)x;
 
+/* _kernel_irqs_disabled/_kernel_irqs_off/_kernel_irqs_on have no __riscos64
+ * equivalent, so fall back to the OS_IntOff/OS_IntOn SWIs there. Those SWIs
+ * don't report the previous interrupt state, so the 64-bit version always
+ * reports 'not already disabled' and unconditionally re-enables interrupts
+ * afterwards; the sections guarded here are short and not expected to be
+ * entered with interrupts already off.
+ */
+#if defined(__riscos64)
+static int os_irqs_disabled(void)
+{
+    return 0;
+}
+static void os_irqs_off(void)
+{
+    _swix(OS_IntOff, 0);
+}
+static void os_irqs_on(void)
+{
+    _swix(OS_IntOn, 0);
+}
+#else
+#define os_irqs_disabled() _kernel_irqs_disabled()
+#define os_irqs_off()      _kernel_irqs_off()
+#define os_irqs_on()       _kernel_irqs_on()
+#endif
+
 static device_t* devices = 0;
 
 static int next_id = 1;
@@ -61,12 +87,12 @@ _kernel_oserror *AnnounceCallback_Handler(_kernel_swi_regs *r, void *pw)
   dprintf(("", "announce callback handler\n"));
 
   if (notify_list) {
-    int irqs_disabled = _kernel_irqs_disabled();
+    int irqs_disabled = os_irqs_disabled();
     struct notify_list_s *item = 0;
-    if (!irqs_disabled) _kernel_irqs_off();
+    if (!irqs_disabled) os_irqs_off();
     item = notify_list;
     notify_list = notify_list->next;
-    if (!irqs_disabled) _kernel_irqs_on();
+    if (!irqs_disabled) os_irqs_on();
 
     // Notify and free
     device_notify_announce(item->device, 1);
@@ -125,17 +151,17 @@ int devices_register(device_t *device, void *pw)
     int irqs_disabled;
     struct notify_list_s *item = 0;
 
-    irqs_disabled = _kernel_irqs_disabled();
-    if (!irqs_disabled) _kernel_irqs_off();
+    irqs_disabled = os_irqs_disabled();
+    if (!irqs_disabled) os_irqs_off();
     device->id = next_id++;
-    if (!irqs_disabled) _kernel_irqs_on();
+    if (!irqs_disabled) os_irqs_on();
 
     dprintf(("", "registering device '%s' as device %lu [code:%p ws:%p ref:%p]\n",
                  device->info.description, device->id,
                  device->driver_code, device->driver_ws, device->driver_ref));
 
-    irqs_disabled = _kernel_irqs_disabled();
-    if (!irqs_disabled) _kernel_irqs_off();
+    irqs_disabled = os_irqs_disabled();
+    if (!irqs_disabled) os_irqs_off();
     /* FIXME: If we've wrapped, this is not sufficient; we need to find a gap.
      *        this case is unlikely so I don't care for now.
      */
@@ -169,7 +195,7 @@ int devices_register(device_t *device, void *pw)
 
     }
 
-    if (!irqs_disabled) _kernel_irqs_on();
+    if (!irqs_disabled) os_irqs_on();
     return 0;
 }
 
