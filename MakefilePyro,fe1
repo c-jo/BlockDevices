@@ -56,7 +56,7 @@ OBJS       = o.BlockDevicesHdr \
 # Documentation source files
 ifdef __crosscompile
 # Docs don't build on RISC OS yet
-DOCSRC = prminxml.blockdevices/xml
+DOCSRC = prminxml.BlockDevices/xml
 endif
 
 FORTIFY = no

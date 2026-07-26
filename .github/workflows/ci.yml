@@ -97,6 +97,38 @@ jobs:
           name: RISCOS-build
           path: ${{ steps.version.outputs.leafname }}
 
+  build-docs:
+    runs-on: ubuntu-latest
+    outputs:
+      leafname: ${{ steps.docsversion.outputs.leafname }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build PRM-in-XML documentation
+        uses: gerph/riscos-prminxml-action@v1
+        with:
+          files: prminxml/${{ env.COMPONENT_NAME }}.xml
+          output: docs-output
+          pdf-generator: prince
+          style: prm
+
+      - name: Package documentation
+        id: docsversion
+        run: |
+          if [ -f VersionNum ] ; then
+              version=$(awk -F'"' '/^#define Module_FullVersion[[:space:]]+"/ { print $2; exit }' VersionNum)
+          else
+              version=$(git rev-parse --short HEAD)
+          fi
+          leafname="${COMPONENT_NAME}-Documentation-$version.zip"
+          cd docs-output && zip -q9r "../$leafname" *
+          echo "leafname=$leafname" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: RISCOS-Documentation
+          path: ${{ steps.docsversion.outputs.leafname }}
+
   test-riscos-32:
     needs: build-riscos
     runs-on: ubuntu-latest
@@ -150,6 +182,7 @@ jobs:
   release:
     needs:
       - build-riscos
+      - build-docs
       - test-riscos-32
       - test-riscos-64
     runs-on: ubuntu-latest
@@ -162,11 +195,16 @@ jobs:
         with:
           name: RISCOS-build
 
+      - name: Download built documentation
+        uses: actions/download-artifact@v8
+        with:
+          name: RISCOS-Documentation
+
       - name: Create Release
         id: create_release
         uses: ncipollo/release-action@v1
         with:
           prerelease: false
           draft: true
-          artifacts: "${{ needs.build-riscos.outputs.leafname }}"
+          artifacts: "${{ needs.build-riscos.outputs.leafname }},${{ needs.build-docs.outputs.leafname }}"
           artifactContentType: application/zip

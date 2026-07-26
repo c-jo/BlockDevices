@@ -1,0 +1,1550 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="BlockDevices">
+
+<section title="Introduction">
+<p>
+The <strong>BlockDevices</strong> module provides a single, central registry
+for block-addressable storage devices - controllers, drives, discs,
+partitions and similar objects - so that client software does not need
+to know how any particular piece of storage hardware is attached to the
+machine or driven.
+</p>
+<p>
+Two quite different audiences use the module:
+<list type="unordered">
+ <item><p>Client software, such as filing systems, disc utilities and
+ partitioning tools, which wants to enumerate the storage devices present on
+ a machine and read or write blocks of data on them, without needing to know
+ anything about the underlying interface (IDE, SCSI, NVMe, USB and so on).</p></item>
+ <item><p>Device drivers, which know how to talk to a particular piece of
+ storage hardware, and which register the devices they control with
+ BlockDevices so that client software can find and use them.</p></item>
+</list>
+</p>
+<p>
+BlockDevices does not talk to any hardware itself. It is purely a registry
+and dispatcher: it allocates device identifiers, keeps track of the
+relationships between devices (for example, that a partition belongs to a
+particular disc), validates block ranges, and forwards read, write and other
+requests to whichever driver registered the device concerned. This
+decouples the client interface, described below, from the driver
+registration interface used to add and remove devices.
+</p>
+</section>
+
+<section title="Overview">
+<p>
+Every device known to BlockDevices is identified by a small positive integer,
+the <strong>device id</strong>, allocated by the module at the time a driver
+registers the device. The value zero is never a valid device id; it is used
+to mean "no device" or "no parent" where such a
+meaning is required.
+</p>
+<p>
+Devices form a simple tree. A device may have a <strong>parent
+device</strong>, recorded as another device's id, so that (for example) a
+partition can record which disc it was found on, and a disc can record which
+controller or drive it was found through. Client software can either walk
+every registered device with
+<reference type="swi" name="BlockDevice_Enumerate"/>, or restrict itself to
+the direct children of a particular device with
+<reference type="swi" name="BlockDevice_EnumerateChildren"/>.
+</p>
+<p>
+Each device carries a type classification along four independent axes:
+what kind of device it is (controller, drive, disc, partition or track), what
+interface it is attached through (IDE, SCSI, NVMe and so on), what physical
+connection carries that interface (motherboard, podule, USB and so on), and
+what kind of media it represents (floppy, hard disc, SSD and so on). These
+are described in full in <reference type="subsection"
+name="Device, Interface, Connection and Media Types"/>.
+</p>
+<p>
+Device names are expected to follow a hierarchical convention, similar to a
+filing system pathname, so that a device's name reflects its position in the
+tree. For example, a driver might choose to register devices using names
+such as:
+</p>
+<p>
+<list type="unordered">
+ <item><p><userinput>scsi/1/2/3</userinput> - the SCSI device on bus 1,
+ device 2, LUN 3.</p></item>
+ <item><p><userinput>nvme/0/1</userinput> - the second disc attached to
+ the first NVMe device.</p></item>
+ <item><p><userinput>nvme/0/1/gpt/0</userinput> - the first partition on
+ the above device, described using its GUID Partition Table entry.</p></item>
+</list>
+</p>
+<p>
+This hierarchy is a convention for driver authors to follow when choosing the
+name they pass to <reference type="swi" name="BlockDevice_Register"/>; the
+module itself does not construct or verify path-like names, it only
+guarantees that the name presented to client software is not ambiguous. See
+<reference type="subsection" name="Device Naming"/> for exactly what the module
+does with the name it is given.
+</p>
+<p>
+A device only becomes visible to client software once it has been
+registered. The module announces newly registered and removed devices to the
+rest of the system using its own service calls, described in
+<reference type="section" name="Service Calls"/>; these are particularly
+important to filing systems and other software that wants to react promptly
+to storage being attached or removed, rather than polling
+<reference type="swi" name="BlockDevice_Enumerate"/> repeatedly.
+</p>
+</section>
+
+<section title="Technical Details">
+
+<subsection title="Device Identifiers">
+<p>
+Device ids are allocated sequentially by BlockDevices as devices are
+registered, starting from 1. The value 0 (<userinput>DeviceId_Invalid</userinput>
+in <filename>BlockDevices.h</filename>) is never allocated to a real device,
+and is used both to mean "no parent device" in a device's
+information block, and to mean "start enumeration from the
+beginning" in the enumeration SWIs.
+</p>
+<p>
+A device id remains valid, and continues to refer to the same device, for as
+long as that device stays registered. Deregistering a device
+(<reference type="swi" name="BlockDevice_Deregister"/>) invalidates its id
+permanently; the id is not reused. Rescanning a device
+(<reference type="swi" name="BlockDevice_Rescan"/>) does not change its id.
+</p>
+</subsection>
+
+<subsection title="Device Information Block">
+<p>
+Every device is described by a device information block, a structure of type
+<userinput>device_info_t</userinput> defined in
+<filename>BlockDevices.h</filename>. A pointer to this structure is what is
+passed to a driver at registration, and what is returned by
+<reference type="swi" name="BlockDevice_Info"/>,
+<reference type="swi" name="BlockDevice_Enumerate"/> and
+<reference type="swi" name="BlockDevice_EnumerateChildren"/>.
+</p>
+<p>
+<definition-table head-name="Field" head-extra="Type" head-value="Description">
+ <definition name="name" extra="string pointer">The device's registered name (see <reference type="subsection" name="Device Naming"/>).</definition>
+ <definition name="flags" extra="unsigned">Device flags; see <reference type="subsection" name="Device Flags"/>.</definition>
+ <definition name="parent_device" extra="unsigned">The device id of this device's parent, or 0 if it has none.</definition>
+ <definition name="device_index" extra="unsigned">An explicit index to use when disambiguating the device's name, or 0 to have one allocated automatically; see <reference type="subsection" name="Device Naming"/>.</definition>
+ <definition name="block_count" extra="64-bit unsigned">The total number of addressable blocks on the device.</definition>
+ <definition name="block_size" extra="unsigned">The size, in bytes, of one block on the device.</definition>
+ <definition name="device_type" extra="enumeration">What kind of device this is; see <reference type="subsection" name="Device, Interface, Connection and Media Types"/>.</definition>
+ <definition name="interface_type" extra="enumeration">The interface the device is attached through.</definition>
+ <definition name="connection_type" extra="enumeration">The physical connection carrying that interface.</definition>
+ <definition name="media_type" extra="enumeration">The kind of media the device represents.</definition>
+ <definition name="description" extra="string pointer">A human-readable description of the device, suitable for display to a user.</definition>
+</definition-table>
+</p>
+<p>
+<filename>BlockDevices.h</filename> is built for both 32-bit and 64-bit RISC
+OS. The <userinput>name</userinput> and <userinput>description</userinput>
+fields are ordinary pointers, and <userinput>block_count</userinput> is
+always a genuine 64-bit value; the byte offset of every field after the first
+pointer therefore differs between a 32-bit build, where pointers are 4 bytes,
+and a 64-bit build, where they are 8 bytes. Code that needs the structure's
+exact in-memory layout should always do so via the supplied header rather
+than by assuming fixed byte offsets.
+</p>
+</subsection>
+
+<subsection title="Device, Interface, Connection and Media Types">
+<p>
+A device's classification is recorded along four independent axes. Each is a
+small enumeration:
+</p>
+<p>
+<value-table head-number="Value" head-value="Device type">
+ <value number="0">Unknown</value>
+ <value number="1">Controller</value>
+ <value number="2">Drive</value>
+ <value number="3">Disc</value>
+ <value number="4">Partition</value>
+ <value number="5">Track</value>
+</value-table>
+</p>
+<p>
+<value-table head-number="Value" head-value="Interface type">
+ <value number="0">Unknown</value>
+ <value number="1">FDC</value>
+ <value number="2">ST506</value>
+ <value number="3">IDE</value>
+ <value number="4">SATA</value>
+ <value number="5">SCSI</value>
+ <value number="6">NVMe</value>
+ <value number="7">RAM</value>
+</value-table>
+</p>
+<p>
+<value-table head-number="Value" head-value="Connection type">
+ <value number="0">Unknown</value>
+ <value number="1">Motherboard</value>
+ <value number="2">Podule</value>
+ <value number="3">PCI</value>
+ <value number="4">Parallel</value>
+ <value number="5">Serial</value>
+ <value number="6">USB</value>
+</value-table>
+</p>
+<p>
+<value-table head-number="Value" head-value="Media type">
+ <value number="0">Unknown</value>
+ <value number="1">Floppy</value>
+ <value number="2">HardDisc</value>
+ <value number="3">SSD</value>
+ <value number="4">RAM</value>
+ <value number="5">CD</value>
+ <value number="6">DVD</value>
+ <value number="7">BluRay</value>
+</value-table>
+</p>
+<p>
+Each of the four enumerations also defines a value of -1, named
+<userinput>Parent</userinput> in each case (for example
+<userinput>BlockDevice_DeviceType_Parent</userinput>). This value is only
+meaningful when registering a new device: it tells BlockDevices to copy that
+particular classification from the device's parent, rather than have the
+registering driver state it explicitly. If <userinput>Parent</userinput> is
+used but the device has no valid parent - either because
+<userinput>parent_device</userinput> is 0, or because it does not refer to a
+currently registered device - registration fails with
+<reference type="error" name="RegisterFailed"/>.
+</p>
+</subsection>
+
+<subsection title="Device Flags">
+<p>
+The <userinput>flags</userinput> field of the device information block is a
+bit mask:
+</p>
+<p>
+<bitfield-table>
+ <bit number="0" name="ReadOnly">Set if the device cannot be written to.</bit>
+ <bit number="1" name="CanEject">Set if the device supports an eject operation.</bit>
+ <bit number="2-30" state="reserved">Reserved; must be clear.</bit>
+ <bit number="31" name="Debug">Set to indicate that debug output is enabled for the device.</bit>
+</bitfield-table>
+</p>
+</subsection>
+
+<subsection title="Transfer Block">
+<p>
+Read, write and verify requests describe the data to be transferred using a
+transfer block, of type <userinput>transfer_block_t</userinput>:
+</p>
+<p>
+<definition-table head-name="Field" head-extra="Type" head-value="Description">
+ <definition name="lba" extra="64-bit unsigned">The logical block address at which the transfer starts.</definition>
+ <definition name="address" extra="pointer">The memory address to transfer to or from. Ignored for a verify operation.</definition>
+ <definition name="count" extra="unsigned">The number of blocks to transfer.</definition>
+</definition-table>
+</p>
+<p>
+The transfer block is passed by reference and is updated in place by the
+device driver, even when the transfer fails partway through, so that the
+caller can see exactly how much of the request was actually completed.
+</p>
+<p>
+<fixme>
+The bounds check applied to a transfer block before it is passed to a
+device driver currently differs between 32-bit and 64-bit builds of this
+module: one treats "count" consistently as a number of
+blocks, as documented above and in the header, while the other divides it by
+the device's block size as though it were a byte count. Until this is
+resolved, do not rely on a request being accepted or rejected identically
+across architectures right at the edge of a device's capacity.
+</fixme>
+</p>
+</subsection>
+
+<subsection title="Device Naming">
+<p>
+When a device is registered, BlockDevices takes the name supplied in the
+device information block and appends a sequence number to it, separated by
+a hyphen, to guarantee that the name presented to client software is unique.
+</p>
+<p>
+If <userinput>device_index</userinput> is non-zero, that value is used
+directly as the sequence number. If it is zero, BlockDevices allocates the
+next unused sequence number itself, counting separately for each combination
+of supplied name and parent device; the first device registered with a given
+name under a given parent is given sequence number 1, the second is given
+sequence number 2, and so on, regardless of the order in which they are
+later deregistered.
+</p>
+<p>
+A registering driver that wants its device to appear with a name reflecting
+its position in the device hierarchy (see <reference type="section"
+name="Overview"/>) is responsible for constructing that name itself before
+calling <reference type="swi" name="BlockDevice_Register"/>, typically by
+reading its parent's registered name with <reference type="swi"
+name="BlockDevice_Info"/> and appending an identifying component to it.
+BlockDevices does not build this hierarchy on the driver's behalf, and does
+not require the name to start with a <userinput>/</userinput> character or to
+contain any particular separator.
+</p>
+<p>
+A device information block with no name at all (a null pointer) is rejected
+by <reference type="swi" name="BlockDevice_Register"/>, which fails with
+<reference type="error" name="RegisterFailed"/>; an empty string is accepted,
+and produces a name consisting only of a hyphen and the sequence number.
+</p>
+</subsection>
+
+</section>
+
+<section title="Service Calls">
+<p>
+BlockDevices defines four service calls of its own, which it issues to
+announce its own lifecycle and the arrival and departure of individual
+devices. It does not expect any of these to be claimed. It also handles the
+standard <reference type="service" name="ShutDownComplete"/> service, using
+it as a final opportunity to announce every device it still has registered
+as removed before the system finishes shutting down.
+</p>
+
+<service-definition name="BlockDevices_Started" number="81200"
+                    description="The BlockDevices module has completed initialisation">
+<entry>
+ <register-use number="1">&hex;81200 (service number)</register-use>
+</entry>
+<exit>
+ <register-use number="0-9" state="preserved"/>
+</exit>
+<use>
+<p>
+This service is issued once, shortly after the module has finished starting
+up, and before any devices have had the opportunity to register. Software
+that wants to know when the block device registry is available for use, for
+example to trigger an initial scan for storage hardware, should watch for
+this service rather than assuming the module is present and ready as soon as
+it has been loaded.
+</p>
+</use>
+<related>
+ <reference type="service" name="BlockDevices_Dying"/>
+</related>
+</service-definition>
+
+<service-definition name="BlockDevices_Dying" number="81201"
+                    description="The BlockDevices module is about to be finalised">
+<entry>
+ <register-use number="1">&hex;81201 (service number)</register-use>
+</entry>
+<exit>
+ <register-use number="0-9" state="preserved"/>
+</exit>
+<use>
+<p>
+This service is issued as the very last step before the module finishes
+finalising, once it has already announced every device still registered as
+removed (see <reference type="service" name="BlockDevices_DeviceRemoved"/>).
+Software that has been keeping its own list of devices, built up from
+<reference type="service" name="BlockDevices_DeviceAdded"/> and
+<reference type="service" name="BlockDevices_DeviceRemoved"/>, can use this
+service purely as confirmation that the registry itself has gone; by the
+time it arrives, that list should already be empty.
+</p>
+</use>
+<related>
+ <reference type="service" name="BlockDevices_Started"/>
+</related>
+</service-definition>
+
+<service-definition name="BlockDevices_DeviceAdded" number="81202"
+                    description="A new block device has been registered">
+<entry>
+ <register-use number="0">The device id of the newly registered device</register-use>
+ <register-use number="1">&hex;81202 (service number)</register-use>
+ <register-use number="2">Pointer to the device's device information block</register-use>
+</entry>
+<exit>
+ <register-use number="0-9" state="preserved"/>
+</exit>
+<use>
+<p>
+This service is issued once for every device that is registered with
+<reference type="swi" name="BlockDevice_Register"/>. It is delivered
+asynchronously, from a callback queued after the registering SWI has already
+returned; a driver's call to <reference type="swi" name="BlockDevice_Register"/>
+therefore completes, and returns the new device id, before this service has
+necessarily been broadcast. If several devices are registered in quick
+succession, the corresponding services are queued and delivered one at a
+time, in the order the devices were registered.
+</p>
+<p>
+The pointer given in R2 is only valid for the duration of this service call;
+it must not be retained beyond it.
+</p>
+</use>
+<related>
+ <reference type="swi" name="BlockDevice_Register"/>
+ <reference type="service" name="BlockDevices_DeviceRemoved"/>
+</related>
+</service-definition>
+
+<service-definition name="BlockDevices_DeviceRemoved" number="81203"
+                    description="A block device has been deregistered">
+<entry>
+ <register-use number="0">The device id of the device being removed</register-use>
+ <register-use number="1">&hex;81203 (service number)</register-use>
+ <register-use number="2">Pointer to the device's device information block, as it was immediately before removal</register-use>
+</entry>
+<exit>
+ <register-use number="0-9" state="preserved"/>
+</exit>
+<use>
+<p>
+Unlike <reference type="service" name="BlockDevices_DeviceAdded"/>, this
+service is issued synchronously, at the point the removal happens, in each
+of three circumstances:
+<list type="unordered">
+ <item><p>A driver calls <reference type="swi" name="BlockDevice_Deregister"/>
+ to remove one of its devices. The service is issued before the SWI
+ returns.</p></item>
+ <item><p>A driver, or other software, calls <reference type="swi"
+ name="BlockDevice_Rescan"/> on a device. In this case the service is
+ followed immediately by a fresh <reference type="service"
+ name="BlockDevices_DeviceAdded"/> for the same device id, and the device
+ itself is not actually removed from the registry; this pairing exists so
+ that software watching for these services can be told to re-read a device's
+ information, for example after a media change, without having to treat the
+ device as if it had been unplugged and replaced.</p></item>
+ <item><p>The module itself is finalised, in which case it is issued once for
+ every device still registered, before <reference type="service"
+ name="BlockDevices_Dying"/> is issued.</p></item>
+</list>
+</p>
+<p>
+As with <reference type="service" name="BlockDevices_DeviceAdded"/>, the
+pointer given in R2 is only valid for the duration of the service call.
+Once it returns, the device id may no longer be used with any of the client
+or driver SWIs, except in the rescan case above, where the same id continues
+to refer to the same device.
+</p>
+</use>
+<related>
+ <reference type="swi" name="BlockDevice_Deregister"/>
+ <reference type="swi" name="BlockDevice_Rescan"/>
+ <reference type="service" name="BlockDevices_DeviceAdded"/>
+</related>
+</service-definition>
+
+</section>
+
+<section title="SWI Calls">
+<p>
+BlockDevices provides SWIs to two different audiences. The first group,
+described first, is intended for client software that wants to find and use
+registered devices. The second group is intended for device drivers, and is
+used to register and deregister the devices those drivers control.
+</p>
+
+<swi-definition name="BlockDevice_Enumerate" number="5A6D3"
+                description="Enumerates the block devices currently registered"
+                processor-mode="SVC">
+<entry>
+ <register-use number="0">The device id of the last device returned, or 0 to start enumeration from the first device</register-use>
+</entry>
+<exit>
+ <register-use number="0">0 if there are no more devices; otherwise the device id of the next registered device</register-use>
+ <register-use number="1">Pointer to that device's device information block. Only meaningful if R0 is non-zero.</register-use>
+</exit>
+<use>
+<p>
+Repeated calls, each passing back the device id returned in R0 by the
+previous call, visit every device currently registered, regardless of its
+position in the device hierarchy, until R0 comes back as 0. To enumerate
+only the direct children of a particular device, use
+<reference type="swi" name="BlockDevice_EnumerateChildren"/> instead.
+</p>
+<p>
+The set of devices visited is not fixed for the duration of an enumeration:
+devices registered or removed between calls may or may not be seen,
+depending on where they fall relative to the point the enumeration has
+reached.
+</p>
+</use>
+<related>
+ <reference type="swi" name="BlockDevice_EnumerateChildren"/>
+ <reference type="swi" name="BlockDevice_Info"/>
+</related>
+</swi-definition>
+
+<swi-definition name="BlockDevice_EnumerateChildren" number="5A6D4"
+                description="Enumerates the direct children of a given device"
+                processor-mode="SVC">
+<entry>
+ <register-use number="0">The device id of the last child returned, or 0 to start enumeration from the first matching device</register-use>
+ <register-use number="1">The device id of the parent device whose children are being enumerated, or 0 to enumerate devices which have no parent</register-use>
+</entry>
+<exit>
+ <register-use number="0">0 if there are no more matching devices; otherwise the device id of the next child device</register-use>
+ <register-use number="1">Pointer to that device's device information block. Only meaningful if R0 is non-zero.</register-use>
+</exit>
+<use>
+<p>
+This behaves as <reference type="swi" name="BlockDevice_Enumerate"/> does,
+except that only devices whose <userinput>parent_device</userinput> matches
+the value supplied in R1 are considered; it does not recurse into
+grandchildren.
+</p>
+<p>
+Because R1 is used both to supply the parent device id on entry and to
+return a device information pointer on exit, the parent device id is not
+preserved across calls. The same parent device id must be passed in R1 again
+on every call used to continue a single enumeration.
+</p>
+</use>
+<related>
+ <reference type="swi" name="BlockDevice_Enumerate"/>
+</related>
+</swi-definition>
+
+<swi-definition name="BlockDevice_Info" number="5A6C0"
+                description="Reads the device information block for a single device"
+                processor-mode="SVC">
+<entry>
+ <register-use number="0">Device id</register-use>
+</entry>
+<exit>
+ <register-use number="1">Pointer to the device's device information block</register-use>
+</exit>
+<use>
+<p>
+This provides a direct way to look up a single device's information block
+when its device id is already known, without walking the full list of
+registered devices with <reference type="swi" name="BlockDevice_Enumerate"/>.
+</p>
+</use>
+<related>
+ <reference type="error" name="BadDevice"/>
+</related>
+</swi-definition>
+
+<swi-definition name="BlockDevice_Read" number="5A6C1"
+                description="Reads one or more blocks from a device"
+                processor-mode="SVC">
+<entry>
+ <register-use number="0">Device id to read from</register-use>
+ <register-use number="1">Flags for the read operation</register-use>
+ <register-use number="2">Pointer to a transfer block describing the read</register-use>
+</entry>
+<exit>
+ <register-use number="2">Pointer to the same transfer block, updated to reflect the amount of data actually transferred</register-use>
+</exit>
+<use>
+<p>
+BlockDevices checks that the requested block range lies within the device's
+reported capacity before calling the device driver; if it does not, the call
+fails with <reference type="error" name="TransferOutsideDevice"/> and the
+driver is not called at all.
+</p>
+<p>
+No flag bits in R1 are currently defined by BlockDevices itself; the value is
+passed through unchanged to the device driver, which is free to interpret it
+according to its own requirements. Callers should pass 0 unless a specific
+driver documents otherwise.
+</p>
+</use>
+<related>
+ <reference type="swi" name="BlockDevice_Write"/>
+ <reference type="swi" name="BlockDevice_Verify"/>
+ <reference type="error" name="BadDevice"/>
+ <reference type="error" name="TransferOutsideDevice"/>
+</related>
+</swi-definition>
+
+<swi-definition name="BlockDevice_Write" number="5A6C2"
+                description="Writes one or more blocks to a device"
+                processor-mode="SVC">
+<entry>
+ <register-use number="0">Device id to write to</register-use>
+ <register-use number="1">Flags for the write operation</register-use>
+ <register-use number="2">Pointer to a transfer block describing the write</register-use>
+</entry>
+<exit>
+ <register-use number="2">Pointer to the same transfer block, updated to reflect the amount of data actually transferred</register-use>
+</exit>
+<use>
+<p>
+This behaves as <reference type="swi" name="BlockDevice_Read"/> does, except
+that data is transferred from memory to the device. If the device was
+registered with the <userinput>ReadOnly</userinput> flag set, a well-behaved
+device driver returns <reference type="error" name="ReadOnly"/> rather than
+performing the write.
+</p>
+</use>
+<related>
+ <reference type="swi" name="BlockDevice_Read"/>
+ <reference type="error" name="ReadOnly"/>
+ <reference type="error" name="TransferOutsideDevice"/>
+</related>
+</swi-definition>
+
+<swi-definition name="BlockDevice_Verify" number="5A6C3"
+                description="Verifies one or more blocks on a device"
+                processor-mode="SVC">
+<entry>
+ <register-use number="0">Device id to verify</register-use>
+ <register-use number="1">Flags for the verify operation</register-use>
+ <register-use number="2">Pointer to a transfer block describing the verify. The <userinput>address</userinput> field is ignored.</register-use>
+</entry>
+<exit>
+ <register-use number="2">Pointer to the same transfer block, updated to reflect the amount of data actually verified</register-use>
+</exit>
+<use>
+<p>
+This behaves as <reference type="swi" name="BlockDevice_Read"/> does, except
+that no data is transferred to memory; the device driver is simply asked to
+confirm that the given blocks can be read successfully.
+</p>
+</use>
+<related>
+ <reference type="swi" name="BlockDevice_Read"/>
+</related>
+</swi-definition>
+
+<swi-definition name="BlockDevice_DeviceOp" number="5A6C4"
+                description="Performs a miscellaneous whole-device operation"
+                processor-mode="SVC">
+<entry>
+ <register-use number="0">Device id</register-use>
+ <register-use number="1">
+  <p>
+  Operation code:
+  <value-table head-number="Value" head-value="Operation">
+   <value number="1"><reference type="swi" name="BlockDevice_DeviceOp" reason="1" use-description="yes"/></value>
+   <value number="2"><reference type="swi" name="BlockDevice_DeviceOp" reason="2" use-description="yes"/></value>
+   <value number="3"><reference type="swi" name="BlockDevice_DeviceOp" reason="3" use-description="yes"/></value>
+   <value number="4"><reference type="swi" name="BlockDevice_DeviceOp" reason="4" use-description="yes"/></value>
+   <value number="5"><reference type="swi" name="BlockDevice_DeviceOp" reason="5" use-description="yes"/></value>
+   <value number="6"><reference type="swi" name="BlockDevice_DeviceOp" reason="6" use-description="yes"/></value>
+   <value number="7"><reference type="swi" name="BlockDevice_DeviceOp" reason="7" use-description="yes"/></value>
+  </value-table>
+  </p>
+ </register-use>
+ <register-use number="2-7">Dependent on operation code</register-use>
+</entry>
+<use>
+<p>
+This SWI is forwarded directly to the device's driver, which is responsible
+for implementing whichever of the operation codes below it supports, and for
+returning <reference type="error" name="BadMiscOp"/> for any it does not.
+</p>
+</use>
+</swi-definition>
+
+<swi-definition name="BlockDevice_DeviceOp" number="5A6C4" reason="1" reasonname="SerialNumber"
+                description="Reads the device's serial number">
+<entry>
+ <register-use number="0">Device id</register-use>
+ <register-use number="1">1 (operation code)</register-use>
+</entry>
+<exit>
+ <register-use number="0">Pointer to a zero-terminated string giving the device's serial number</register-use>
+</exit>
+<use>
+<p>Returns the serial number reported by the underlying hardware, where the driver is able to obtain one.</p>
+</use>
+<related><reference type="swi" name="BlockDevice_DeviceOp"/></related>
+</swi-definition>
+
+<swi-definition name="BlockDevice_DeviceOp" number="5A6C4" reason="2" reasonname="ModelName"
+                description="Reads the device's model name">
+<entry>
+ <register-use number="0">Device id</register-use>
+ <register-use number="1">2 (operation code)</register-use>
+</entry>
+<exit>
+ <register-use number="0">Pointer to a zero-terminated string giving the device's model name</register-use>
+</exit>
+<use>
+<p>Returns the model name reported by the underlying hardware.</p>
+</use>
+<related><reference type="swi" name="BlockDevice_DeviceOp"/></related>
+</swi-definition>
+
+<swi-definition name="BlockDevice_DeviceOp" number="5A6C4" reason="3" reasonname="Firmware"
+                description="Reads the device's firmware version">
+<entry>
+ <register-use number="0">Device id</register-use>
+ <register-use number="1">3 (operation code)</register-use>
+</entry>
+<exit>
+ <register-use number="0">Pointer to a zero-terminated string giving the device's firmware version</register-use>
+</exit>
+<use>
+<p>Returns the firmware version reported by the underlying hardware.</p>
+</use>
+<related><reference type="swi" name="BlockDevice_DeviceOp"/></related>
+</swi-definition>
+
+<swi-definition name="BlockDevice_DeviceOp" number="5A6C4" reason="4" reasonname="SMART"
+                description="Reads SMART health attributes for the device">
+<entry>
+ <register-use number="0">Device id</register-use>
+ <register-use number="1">4 (operation code)</register-use>
+ <register-use number="2">Pointer to a buffer to receive SMART attribute entries, or 0 to only discover how many are available</register-use>
+ <register-use number="3">The size of the buffer, in entries; or, together with R4 set to 0, requests that the number of entries needed is returned instead of reading any</register-use>
+</entry>
+<exit>
+ <register-use number="3">The number of entries returned, or the number required if the supplied buffer was too small</register-use>
+</exit>
+<use>
+<p>
+Each entry returned is a <userinput>smart_attribute_t</userinput>, giving the
+attribute's status, type, identifying number and value, in a form that
+depends on the interface type of the underlying device (general, IDE, SCSI
+or NVMe). If the supplied buffer is not large enough for the number of
+attributes available, R3 is set to the number that would have been needed,
+and, unless R2 was 0, an error is returned rather than a partial result.
+</p>
+</use>
+<related><reference type="swi" name="BlockDevice_DeviceOp"/></related>
+</swi-definition>
+
+<swi-definition name="BlockDevice_DeviceOp" number="5A6C4" reason="5" reasonname="SelfTest"
+                description="Starts, or aborts, a self-test on the device">
+<entry>
+ <register-use number="0">Device id</register-use>
+ <register-use number="1">5 (operation code)</register-use>
+ <register-use number="2">
+  <p>
+  Test type:
+  <value-table head-number="Value" head-value="Test">
+   <value number="1">Short self-test</value>
+   <value number="2">Long self-test</value>
+   <value number="3">Conveyance self-test</value>
+   <value number="4">Extended self-test</value>
+   <value number="-1">Abort any self-test in progress</value>
+  </value-table>
+  </p>
+ </register-use>
+</entry>
+<use>
+<p>
+Requests that the device begin the given self-test, or abort a test already
+running. Progress and results are read back with
+<reference type="swi" name="BlockDevice_DeviceOp" reason="6"/>.
+</p>
+</use>
+<related><reference type="swi" name="BlockDevice_DeviceOp"/></related>
+</swi-definition>
+
+<swi-definition name="BlockDevice_DeviceOp" number="5A6C4" reason="6" reasonname="SelfTestLog"
+                description="Reads the device's self-test log">
+<entry>
+ <register-use number="0">Device id</register-use>
+ <register-use number="1">6 (operation code)</register-use>
+ <register-use number="2">Pointer to a buffer to receive log entries</register-use>
+ <register-use number="3">The number of entries to retrieve</register-use>
+</entry>
+<use>
+<p>
+Each entry returned is a <userinput>self_test_result_t</userinput>, giving
+the status, failure reason, percentage complete, test type and interface
+type of one previously requested self-test, together with the time it was
+run and, if applicable, the LBA at which it failed.
+</p>
+</use>
+<related><reference type="swi" name="BlockDevice_DeviceOp"/></related>
+</swi-definition>
+
+<swi-definition name="BlockDevice_DeviceOp" number="5A6C4" reason="7" reasonname="PartitionInfo"
+                description="Reads the partition table entry a partition device was created from">
+<entry>
+ <register-use number="0">Device id</register-use>
+ <register-use number="1">7 (operation code)</register-use>
+</entry>
+<exit>
+ <register-use number="0">
+  <p>
+  The partition scheme used:
+  <value-table head-number="Value" head-value="Scheme">
+   <value number="1">MBR. R1 gives the partition type byte.</value>
+   <value number="2">GPT. R1 points at the partition type GUID, and R2 at the partition's own GUID.</value>
+  </value-table>
+  </p>
+ </register-use>
+</exit>
+<use>
+<p>
+This is only meaningful for a device of type <userinput>Partition</userinput>,
+and describes the scheme-specific entry the partition was created from,
+rather than anything about the underlying disc as a whole.
+</p>
+</use>
+<related><reference type="swi" name="BlockDevice_DeviceOp"/></related>
+</swi-definition>
+
+<swi-definition name="BlockDevice_MediaOp" number="5A6C5"
+                description="Performs a miscellaneous media-related operation"
+                processor-mode="SVC">
+<entry>
+ <register-use number="0">Device id</register-use>
+ <register-use number="1">
+  <p>
+  Operation code:
+  <value-table head-number="Value" head-value="Operation">
+   <value number="2"><reference type="swi" name="BlockDevice_MediaOp" reason="2" use-description="yes"/></value>
+   <value number="3"><reference type="swi" name="BlockDevice_MediaOp" reason="3" use-description="yes"/></value>
+  </value-table>
+  </p>
+ </register-use>
+ <register-use number="2-7">Dependent on operation code</register-use>
+</entry>
+<use>
+<p>
+As with <reference type="swi" name="BlockDevice_DeviceOp"/>, this SWI is
+forwarded directly to the device's driver.
+</p>
+</use>
+</swi-definition>
+
+<swi-definition name="BlockDevice_MediaOp" number="5A6C5" reason="2" reasonname="BlockSizes"
+                description="Lists the block sizes the media supports">
+<entry>
+ <register-use number="0">Device id</register-use>
+ <register-use number="1">2 (operation code)</register-use>
+ <register-use number="2">Pointer to a buffer to receive block size entries</register-use>
+ <register-use number="3">Index of the first entry to return, or 0 to start from the first</register-use>
+ <register-use number="4">The number of entries to retrieve</register-use>
+</entry>
+<exit>
+ <register-use number="3">Index to pass on the next call, to continue after the entries just returned</register-use>
+ <register-use number="4">The number of entries actually returned</register-use>
+</exit>
+<use>
+<p>
+Each entry returned is a <userinput>block_size_t</userinput>, giving a
+supported block size in bytes together with a relative priority, and an
+optional textual description of that priority, so that client software can
+choose sensibly between several supported sizes.
+</p>
+</use>
+<related><reference type="swi" name="BlockDevice_MediaOp" reason="3"/></related>
+</swi-definition>
+
+<swi-definition name="BlockDevice_MediaOp" number="5A6C5" reason="3" reasonname="SetBlockSize"
+                description="Changes the block size used to address the media">
+<entry>
+ <register-use number="0">Device id</register-use>
+ <register-use number="1">3 (operation code)</register-use>
+ <register-use number="2">The new block size, in bytes</register-use>
+</entry>
+<use>
+<p>
+Requests that the device driver reformat its addressing to use the given
+block size, which should be one of those previously reported by
+<reference type="swi" name="BlockDevice_MediaOp" reason="2"/>. This is
+expected to change the device's reported <userinput>block_size</userinput>
+and <userinput>block_count</userinput>.
+</p>
+</use>
+<related><reference type="swi" name="BlockDevice_MediaOp" reason="2"/></related>
+</swi-definition>
+
+<swi-definition name="BlockDevice_SecurityOp" number="5A6C6"
+                description="Performs a miscellaneous security-related operation"
+                processor-mode="SVC">
+<entry>
+ <register-use number="0">Device id</register-use>
+ <register-use number="1">Operation code</register-use>
+ <register-use number="2-7">Dependent on operation code</register-use>
+</entry>
+<use>
+<p>
+This SWI is reserved for security-related operations, such as those
+governing a device's own password locking or encryption facilities, and is
+forwarded directly to the device's driver.
+</p>
+<p>
+<fixme>No operation codes are yet defined for this SWI.</fixme>
+</p>
+</use>
+<related>
+ <reference type="error" name="BadMiscOp"/>
+</related>
+</swi-definition>
+
+<swi-definition name="BlockDevice_SectorOp" number="5A6C7"
+                description="Performs a miscellaneous operation on a range of sectors"
+                processor-mode="SVC">
+<entry>
+ <register-use number="0">Device id</register-use>
+ <register-use number="1">
+  <p>
+  Operation code:
+  <value-table head-number="Value" head-value="Operation">
+   <value number="1"><reference type="swi" name="BlockDevice_SectorOp" reason="1" use-description="yes"/></value>
+  </value-table>
+  </p>
+ </register-use>
+ <register-use number="2-7">Dependent on operation code</register-use>
+</entry>
+<use>
+<p>
+As with <reference type="swi" name="BlockDevice_DeviceOp"/>, this SWI is
+forwarded directly to the device's driver.
+</p>
+</use>
+</swi-definition>
+
+<swi-definition name="BlockDevice_SectorOp" number="5A6C7" reason="1" reasonname="TRIM"
+                description="Advises the device that a range of blocks is no longer in use">
+<entry>
+ <register-use number="0">Device id</register-use>
+ <register-use number="1">1 (operation code)</register-use>
+ <register-use number="2">Pointer to a <userinput>trim_request_t</userinput>, giving the starting LBA and the number of blocks concerned</register-use>
+</entry>
+<use>
+<p>
+This allows client software to tell a device, typically an SSD, that a range
+of blocks no longer holds meaningful data, so that the device can reclaim
+the underlying storage. It has no effect on what is subsequently read back
+from the given range, beyond that the content becomes undefined.
+</p>
+</use>
+<related><reference type="swi" name="BlockDevice_SectorOp"/></related>
+</swi-definition>
+
+<swi-definition name="BlockDevice_DriverOp" number="5A6C8"
+                description="Performs an operation defined entirely by the device driver"
+                processor-mode="SVC">
+<entry>
+ <register-use number="0">Device id</register-use>
+ <register-use number="1">Operation code</register-use>
+ <register-use number="2-7">Dependent on operation code</register-use>
+</entry>
+<use>
+<p>
+Unlike <reference type="swi" name="BlockDevice_DeviceOp"/>,
+<reference type="swi" name="BlockDevice_MediaOp"/>,
+<reference type="swi" name="BlockDevice_SecurityOp"/> and
+<reference type="swi" name="BlockDevice_SectorOp"/>, no operation codes for
+this SWI are defined or reserved by BlockDevices itself. It exists purely as
+a low-level extension point through which a device driver may expose
+operations specific to itself, with the meaning of every register beyond R0
+left entirely to that driver to define and document.
+</p>
+</use>
+<related>
+ <reference type="error" name="BadMiscOp"/>
+</related>
+</swi-definition>
+
+<p>
+The following SWIs are used by device drivers to register and deregister
+the devices they control, and to ask BlockDevices to re-announce a device
+whose information has changed. They are not normally of interest to other
+client software.
+</p>
+
+<swi-definition name="BlockDevice_Register" number="5A6D0"
+                description="Registers a new block device"
+                processor-mode="SVC">
+<entry>
+ <register-use number="0">Flags. Must be 0; non-zero values are reserved for future use.</register-use>
+ <register-use number="1">Pointer to a device information block describing the device</register-use>
+ <register-use number="2">The address of the driver's entry point (see <reference type="section" name="Entry Points"/>)</register-use>
+ <register-use number="3">The value to give the driver in R12 (its private word) every time its entry point is called for this device</register-use>
+ <register-use number="4">An opaque reference the driver will receive in R9 every time its entry point is called for this device</register-use>
+</entry>
+<exit>
+ <register-use number="0">The device id allocated to the newly registered device</register-use>
+</exit>
+<use>
+<p>
+BlockDevices copies the fields of the device information block it needs,
+so the block supplied in R1 need not remain valid once this SWI returns.
+The <userinput>name</userinput> given is adjusted as described in
+<reference type="subsection" name="Device Naming"/>, and any classification
+field given as <userinput>Parent</userinput> is resolved against the given
+parent device, as described in
+<reference type="subsection" name="Device, Interface, Connection and Media Types"/>.
+</p>
+<p>
+The module must have finished starting before a device can be registered;
+calling this SWI too early fails with <reference type="error" name="Starting"/>.
+Registration is announced to the rest of the system with
+<reference type="service" name="BlockDevices_DeviceAdded"/>, delivered
+asynchronously after this SWI has already returned.
+</p>
+</use>
+<related>
+ <reference type="swi" name="BlockDevice_Deregister"/>
+ <reference type="service" name="BlockDevices_DeviceAdded"/>
+ <reference type="error" name="RegisterFailed"/>
+ <reference type="error" name="RegisterFailedFlags"/>
+</related>
+</swi-definition>
+
+<swi-definition name="BlockDevice_Deregister" number="5A6D1"
+                description="Deregisters a block device"
+                processor-mode="SVC">
+<entry>
+ <register-use number="0">Device id to deregister</register-use>
+</entry>
+<use>
+<p>
+This permanently removes the device from the registry; its device id is not
+reused. Removal is announced synchronously, with
+<reference type="service" name="BlockDevices_DeviceRemoved"/> issued before
+this SWI returns. A driver should only deregister devices it registered
+itself, once they are no longer available, for example because the
+underlying hardware has been removed.
+</p>
+</use>
+<related>
+ <reference type="swi" name="BlockDevice_Register"/>
+ <reference type="service" name="BlockDevices_DeviceRemoved"/>
+ <reference type="error" name="BadDevice"/>
+ <reference type="error" name="Starting"/>
+</related>
+</swi-definition>
+
+<swi-definition name="BlockDevice_Rescan" number="5A6D2"
+                description="Announces that a device's information should be re-read"
+                processor-mode="SVC">
+<entry>
+ <register-use number="0">Device id to rescan</register-use>
+</entry>
+<use>
+<p>
+This tells BlockDevices to issue <reference type="service"
+name="BlockDevices_DeviceRemoved"/> immediately followed by
+<reference type="service" name="BlockDevices_DeviceAdded"/> for the given
+device, both before this SWI returns, without actually removing the device
+from the registry or changing its device id. It is intended for a driver to
+call after something about a device has changed in a way its current
+device information block does not reflect, for example a media change on
+removable storage, so that software watching the service calls re-reads the
+device rather than treating it as newly attached hardware.
+</p>
+<p>
+<fixme>
+Passing 0 is documented in the module's own sources as a request to rescan
+every registered device, but the current implementation does not do this: it
+silently succeeds without rescanning anything. Until this is corrected,
+rescan every device of interest individually by device id.
+</fixme>
+</p>
+</use>
+<related>
+ <reference type="swi" name="BlockDevice_Register"/>
+ <reference type="error" name="BadDevice"/>
+ <reference type="error" name="Starting"/>
+</related>
+</swi-definition>
+
+</section>
+
+<section title="Entry Points">
+<p>
+A device driver registers a single entry point address with
+<reference type="swi" name="BlockDevice_Register"/>, together with a private
+word and an opaque reference. BlockDevices calls this entry point directly,
+in SVC mode, with R12 set to the private word supplied at registration, for
+every read, write, verify or miscellaneous operation requested for that
+device; the driver never needs to be a full module, and does not see the
+client's original SWI number.
+</p>
+<p>
+The entry point is always called with the opaque reference supplied at
+registration in R9, and a reason code, identifying which operation is being
+requested, in R8. This allows one entry point, and one private word, to
+serve several devices: a driver can use the reference in R9 to tell its
+devices apart, without needing a separate entry point per device.
+</p>
+
+<entry-definition name="BlockDeviceEntry"
+                  description="Called by BlockDevices to perform an operation on a registered device"
+                  processor-mode="SVC">
+<entry>
+ <register-use number="8">
+  <p>
+  Reason code:
+  <value-table head-number="Value" head-value="Operation">
+   <value number="1"><reference type="entry" name="BlockDeviceEntry" reason="1" use-description="yes"/></value>
+   <value number="2"><reference type="entry" name="BlockDeviceEntry" reason="2" use-description="yes"/></value>
+   <value number="3"><reference type="entry" name="BlockDeviceEntry" reason="3" use-description="yes"/></value>
+   <value number="4"><reference type="entry" name="BlockDeviceEntry" reason="4" use-description="yes"/></value>
+   <value number="5"><reference type="entry" name="BlockDeviceEntry" reason="5" use-description="yes"/></value>
+   <value number="6"><reference type="entry" name="BlockDeviceEntry" reason="6" use-description="yes"/></value>
+   <value number="7"><reference type="entry" name="BlockDeviceEntry" reason="7" use-description="yes"/></value>
+   <value number="8"><reference type="entry" name="BlockDeviceEntry" reason="8" use-description="yes"/></value>
+  </value-table>
+  </p>
+ </register-use>
+ <register-use number="9">The opaque reference supplied when the device was registered</register-use>
+</entry>
+<use>
+<p>
+On failure, the entry point returns a pointer to a standard RISC OS error
+block, exactly as a SWI handler would. On success, it returns registers
+updated as described for each reason code below.
+</p>
+</use>
+<related>
+ <reference type="swi" name="BlockDevice_Register"/>
+</related>
+</entry-definition>
+
+<entry-definition name="BlockDeviceEntry" reason="1" reasonname="Read"
+                  description="Reads blocks from the device">
+<entry>
+ <register-use number="0">Device id</register-use>
+ <register-use number="1">Flags, as supplied to <reference type="swi" name="BlockDevice_Read"/></register-use>
+ <register-use number="2">Pointer to the transfer block supplied to <reference type="swi" name="BlockDevice_Read"/></register-use>
+ <register-use number="8">1 (reason code)</register-use>
+ <register-use number="9">Opaque reference</register-use>
+</entry>
+<exit>
+ <register-use number="2">The same transfer block, updated to reflect the data actually read</register-use>
+</exit>
+<use>
+<p>
+BlockDevices has already checked that the requested range lies within the
+device's reported capacity before calling the driver; see
+<reference type="subsection" name="Transfer Block"/>. The driver is not given
+any registers to update directly: it signals how much was transferred
+purely by updating the fields of the transfer block itself.
+</p>
+</use>
+<related><reference type="entry" name="BlockDeviceEntry"/></related>
+</entry-definition>
+
+<entry-definition name="BlockDeviceEntry" reason="2" reasonname="Write"
+                  description="Writes blocks to the device">
+<entry>
+ <register-use number="0">Device id</register-use>
+ <register-use number="1">Flags, as supplied to <reference type="swi" name="BlockDevice_Write"/></register-use>
+ <register-use number="2">Pointer to the transfer block supplied to <reference type="swi" name="BlockDevice_Write"/></register-use>
+ <register-use number="8">2 (reason code)</register-use>
+ <register-use number="9">Opaque reference</register-use>
+</entry>
+<exit>
+ <register-use number="2">The same transfer block, updated to reflect the data actually written</register-use>
+</exit>
+<use>
+<p>
+A driver for a device registered with the <userinput>ReadOnly</userinput>
+flag set should return <reference type="error" name="ReadOnly"/> here rather
+than performing the write.
+</p>
+</use>
+<related><reference type="entry" name="BlockDeviceEntry"/></related>
+</entry-definition>
+
+<entry-definition name="BlockDeviceEntry" reason="3" reasonname="Verify"
+                  description="Verifies blocks on the device">
+<entry>
+ <register-use number="0">Device id</register-use>
+ <register-use number="1">Flags, as supplied to <reference type="swi" name="BlockDevice_Verify"/></register-use>
+ <register-use number="2">Pointer to the transfer block supplied to <reference type="swi" name="BlockDevice_Verify"/>. The <userinput>address</userinput> field is not meaningful.</register-use>
+ <register-use number="8">3 (reason code)</register-use>
+ <register-use number="9">Opaque reference</register-use>
+</entry>
+<exit>
+ <register-use number="2">The same transfer block, updated to reflect the data actually verified</register-use>
+</exit>
+<use>
+<p>The driver should confirm that the given blocks can be read successfully, without transferring their contents anywhere.</p>
+</use>
+<related><reference type="entry" name="BlockDeviceEntry"/></related>
+</entry-definition>
+
+<entry-definition name="BlockDeviceEntry" reason="4" reasonname="DeviceOp"
+                  description="Performs a whole-device operation requested through BlockDevice_DeviceOp">
+<entry>
+ <register-use number="0-7">As supplied to <reference type="swi" name="BlockDevice_DeviceOp"/>, with R0 the device id and R1 the operation code</register-use>
+ <register-use number="8">4 (reason code)</register-use>
+ <register-use number="9">Opaque reference</register-use>
+</entry>
+<exit>
+ <register-use number="0-7">Returned to the caller of <reference type="swi" name="BlockDevice_DeviceOp"/> exactly as left by the driver; any register the driver does not explicitly set retains the value it had on entry</register-use>
+</exit>
+<use>
+<p>
+The driver should implement whichever of the operation codes described under
+<reference type="swi" name="BlockDevice_DeviceOp"/> it supports, and return
+<reference type="error" name="BadMiscOp"/> for any it does not.
+</p>
+</use>
+<related><reference type="entry" name="BlockDeviceEntry"/></related>
+</entry-definition>
+
+<entry-definition name="BlockDeviceEntry" reason="5" reasonname="MediaOp"
+                  description="Performs a media-related operation requested through BlockDevice_MediaOp">
+<entry>
+ <register-use number="0-7">As supplied to <reference type="swi" name="BlockDevice_MediaOp"/>, with R0 the device id and R1 the operation code</register-use>
+ <register-use number="8">5 (reason code)</register-use>
+ <register-use number="9">Opaque reference</register-use>
+</entry>
+<exit>
+ <register-use number="0-7">Returned to the caller of <reference type="swi" name="BlockDevice_MediaOp"/> exactly as left by the driver; any register the driver does not explicitly set retains the value it had on entry</register-use>
+</exit>
+<use>
+<p>The driver should implement whichever of the operation codes described under <reference type="swi" name="BlockDevice_MediaOp"/> it supports.</p>
+</use>
+<related><reference type="entry" name="BlockDeviceEntry"/></related>
+</entry-definition>
+
+<entry-definition name="BlockDeviceEntry" reason="6" reasonname="SecurityOp"
+                  description="Performs a security-related operation requested through BlockDevice_SecurityOp">
+<entry>
+ <register-use number="0-7">As supplied to <reference type="swi" name="BlockDevice_SecurityOp"/>, with R0 the device id and R1 the operation code</register-use>
+ <register-use number="8">6 (reason code)</register-use>
+ <register-use number="9">Opaque reference</register-use>
+</entry>
+<exit>
+ <register-use number="0-7">Returned to the caller of <reference type="swi" name="BlockDevice_SecurityOp"/> exactly as left by the driver; any register the driver does not explicitly set retains the value it had on entry</register-use>
+</exit>
+<use>
+<p>No operation codes are yet defined for this reason; a driver called with it today should return <reference type="error" name="BadMiscOp"/>.</p>
+</use>
+<related><reference type="entry" name="BlockDeviceEntry"/></related>
+</entry-definition>
+
+<entry-definition name="BlockDeviceEntry" reason="7" reasonname="SectorOp"
+                  description="Performs a sector-range operation requested through BlockDevice_SectorOp">
+<entry>
+ <register-use number="0-7">As supplied to <reference type="swi" name="BlockDevice_SectorOp"/>, with R0 the device id and R1 the operation code</register-use>
+ <register-use number="8">7 (reason code)</register-use>
+ <register-use number="9">Opaque reference</register-use>
+</entry>
+<exit>
+ <register-use number="0-7">Returned to the caller of <reference type="swi" name="BlockDevice_SectorOp"/> exactly as left by the driver; any register the driver does not explicitly set retains the value it had on entry</register-use>
+</exit>
+<use>
+<p>The driver should implement whichever of the operation codes described under <reference type="swi" name="BlockDevice_SectorOp"/> it supports.</p>
+</use>
+<related><reference type="entry" name="BlockDeviceEntry"/></related>
+</entry-definition>
+
+<entry-definition name="BlockDeviceEntry" reason="8" reasonname="DriverOp"
+                  description="Performs an operation requested through BlockDevice_DriverOp">
+<entry>
+ <register-use number="0-7">As supplied to <reference type="swi" name="BlockDevice_DriverOp"/>, with R0 the device id and R1 an operation code defined entirely by the driver</register-use>
+ <register-use number="8">8 (reason code)</register-use>
+ <register-use number="9">Opaque reference</register-use>
+</entry>
+<exit>
+ <register-use number="0-7">Returned to the caller of <reference type="swi" name="BlockDevice_DriverOp"/> exactly as left by the driver; any register the driver does not explicitly set retains the value it had on entry</register-use>
+</exit>
+<use>
+<p>
+This reason exists purely so that individual drivers can offer their own
+extensions; BlockDevices imposes no meaning at all on the registers beyond
+R0.
+</p>
+</use>
+<related><reference type="entry" name="BlockDeviceEntry"/></related>
+</entry-definition>
+
+</section>
+
+<section title="Error Messages">
+<p>
+BlockDevices reports the following errors, all allocated from a single
+registered error base. Several of these - notably
+<reference type="error" name="ReadOnly"/> and
+<reference type="error" name="BadMiscOp"/> - are intended to be
+returned by an individual device driver rather than by BlockDevices itself.
+</p>
+
+<error-definition name="BlockDevice_Starting" number="822300"
+                  description="Module is starting">
+<use><p>Returned by the driver registration SWIs, and by the module's star commands, if they are called before the module has finished starting up.</p></use>
+<related><reference type="swi" name="BlockDevice_Register"/></related>
+</error-definition>
+
+<error-definition name="BlockDevice_InitFailed" number="822301"
+                  description="Initialisation failed">
+<use><p>Reported if the module's own workspace could not be set up when it was started; the module does not start successfully.</p></use>
+</error-definition>
+
+<error-definition name="BlockDevice_BadDevice" number="822302"
+                  description="Bad device identifier to BlockDevices">
+<use><p>Returned by any SWI given a device id that does not currently refer to a registered device.</p></use>
+<related>
+ <reference type="swi" name="BlockDevice_Info"/>
+ <reference type="swi" name="BlockDevice_Deregister"/>
+</related>
+</error-definition>
+
+<error-definition name="BlockDevice_UnsupportedOperation" number="822303"
+                  description="Unsupported operation">
+<use><p>Reserved for use where an operation is understood but cannot be carried out in the caller's current circumstances.</p></use>
+</error-definition>
+
+<error-definition name="BlockDevice_RegisterFailed" number="822304"
+                  description="Device registration failed">
+<use><p>Returned by <reference type="swi" name="BlockDevice_Register"/> if the supplied device information could not be used to create a device, for example because a required parent device could not be found.</p></use>
+<related><reference type="swi" name="BlockDevice_Register"/></related>
+</error-definition>
+
+<error-definition name="BlockDevice_RegisterFailedFlags" number="822305"
+                  description="Device registration failed (flags not supported)">
+<use><p>Reserved for <reference type="swi" name="BlockDevice_Register"/>, for use when a flags value that is not recognised is supplied in R0.</p></use>
+<related><reference type="swi" name="BlockDevice_Register"/></related>
+</error-definition>
+
+<error-definition name="BlockDevice_ReadOnly" number="822306"
+                  description="Device cannot be written to (device is read only)">
+<use><p>Expected to be returned by a device driver when a write is attempted against a device that was registered with the <userinput>ReadOnly</userinput> flag set.</p></use>
+<related><reference type="swi" name="BlockDevice_Write"/></related>
+</error-definition>
+
+<error-definition name="BlockDevice_TransferOutsideDevice" number="822307"
+                  description="Block transfer is beyond device end">
+<use><p>Returned by <reference type="swi" name="BlockDevice_Read"/>, <reference type="swi" name="BlockDevice_Write"/> and <reference type="swi" name="BlockDevice_Verify"/> when the requested block range extends beyond the device's reported capacity. The device driver is not called.</p></use>
+<related>
+ <reference type="swi" name="BlockDevice_Read"/>
+ <reference type="subsection" name="Transfer Block"/>
+</related>
+</error-definition>
+
+<error-definition name="BlockDevice_BadMiscOp" number="822308"
+                  description="BlockDevice does not support MiscOp operation">
+<use><p>Expected to be returned by a device driver when it is asked to perform an operation code, under <reference type="swi" name="BlockDevice_DeviceOp"/>, <reference type="swi" name="BlockDevice_MediaOp"/>, <reference type="swi" name="BlockDevice_SecurityOp"/>, <reference type="swi" name="BlockDevice_SectorOp"/> or <reference type="swi" name="BlockDevice_DriverOp"/>, that it does not implement.</p></use>
+</error-definition>
+
+<error-definition name="BlockDevice_BadParameter" number="822309"
+                  description="Bad parameter">
+<use><p>Reserved for use where a parameter supplied to one of the miscellaneous operation SWIs is invalid for the operation requested.</p></use>
+</error-definition>
+
+<error-definition name="BlockDevice_NoDevices" number="82230A"
+                  description="No block devices found">
+<use><p>Reserved for use where an operation requires at least one registered device to be present.</p></use>
+</error-definition>
+
+</section>
+
+<section title="*Commands">
+<p>
+BlockDevices provides two star commands, both purely informational, for
+inspecting the devices currently registered from the command line.
+</p>
+
+<command-definition name="BlockDevices"
+                    description="Lists the block devices currently registered">
+<syntax>
+</syntax>
+<use>
+<p>
+Displays a table of every registered device, with top-level devices listed
+first and their children indented beneath them, giving each device's id,
+name, description, type, interface, connection, media type and capacity.
+</p>
+</use>
+<example>
+<command>*BlockDevices</command>
+</example>
+<related>
+ <reference type="command" name="BlockDeviceInfo"/>
+ <reference type="swi" name="BlockDevice_Enumerate"/>
+</related>
+</command-definition>
+
+<command-definition name="BlockDeviceInfo"
+                    description="Displays information about a single block device">
+<syntax>
+ <userreplace>device</userreplace>
+</syntax>
+<parameter name="device">
+ The device id of the device to describe, as shown by <reference type="command" name="BlockDevices"/>.
+</parameter>
+<use>
+<p>
+Displays the description, capacity, device type, interface, connection type,
+media type, parent device id and flags of the given device.
+</p>
+</use>
+<example>
+<command>*BlockDeviceInfo 3</command>
+</example>
+<related>
+ <reference type="command" name="BlockDevices"/>
+ <reference type="swi" name="BlockDevice_Info"/>
+</related>
+</command-definition>
+
+</section>
+
+<section title="Examples">
+
+<subsection title="Enumerating registered devices">
+<p>
+The following walks every device currently registered, printing its id and
+description:
+</p>
+<p>
+<extended-example type="c">
+#include "kernel.h"
+#include "swis.h"
+#include "BlockDevices.h"
+
+void list_devices(void)
+{
+    int device_id = 0;
+    device_info_t *info;
+
+    for (;;)
+    {
+        _kernel_oserror *err = _swix(BlockDevice_Enumerate, _INR(0,0) | _OUTR(0,1),
+                                      device_id, &amp;device_id, &amp;info);
+        if (err || device_id == 0)
+            break;
+
+        printf("%d: %s\n", device_id, info->description);
+    }
+}
+</extended-example>
+</p>
+</subsection>
+
+<subsection title="Reading blocks from a device">
+<p>
+Given a device id, a buffer to read into and a starting block address, a
+single read is issued like this:
+</p>
+<p>
+<extended-example type="c">
+#include "kernel.h"
+#include "swis.h"
+#include "BlockDevices.h"
+
+_kernel_oserror *read_blocks(int device_id, blockaddr_t lba,
+                             void *buffer, unsigned count)
+{
+    transfer_block_t transfer;
+
+    transfer.lba     = lba;
+    transfer.address = buffer;
+    transfer.count   = count;
+
+    return _swix(BlockDevice_Read, _INR(0,2), device_id, 0, &amp;transfer);
+}
+</extended-example>
+</p>
+</subsection>
+
+<subsection title="Writing and registering a block device driver">
+<p>
+A driver registers each device it controls once it has identified it,
+supplying a description of the device and an entry point through which
+BlockDevices will call it back:
+</p>
+<p>
+<extended-example type="c">
+#include "kernel.h"
+#include "swis.h"
+#include "BlockDevices.h"
+
+static device_info_t my_device =
+{
+    "mydriver",                          /* name       */
+    0,                                    /* flags      */
+    0,                                    /* parent     */
+    0,                                    /* auto index */
+    2097152,                              /* blocks     */
+    512,                                  /* block size */
+    BlockDevice_DeviceType_Disc,
+    BlockDevice_InterfaceType_SCSI,
+    BlockDevice_ConnectionType_USB,
+    BlockDevice_MediaType_HardDisc,
+    "My Example Disc"
+};
+
+extern void mydriver_entry(void); /* implemented in assembler, or as a
+                                      generic veneer, calling
+                                      mydriver_handler below */
+
+int mydriver_register(void *private_word, void *unit_reference)
+{
+    int device_id;
+    _kernel_oserror *err;
+
+    err = _swix(BlockDevice_Register, _INR(0,4) | _OUTR(0,0),
+                0, &amp;my_device, mydriver_entry, private_word, unit_reference,
+                &amp;device_id);
+    if (err)
+        return -1;
+
+    return device_id;
+}
+</extended-example>
+</p>
+<p>
+The registered entry point dispatches on the reason code it is given in R8,
+handling at least reads and writes:
+</p>
+<p>
+<extended-example type="c">
+_kernel_oserror *mydriver_handler(_kernel_swi_regs *r, void *pw)
+{
+    switch (r->r[8])
+    {
+        case BlockDevices_Reason_Read:
+            return mydriver_read(pw, r->r[9],
+                                  (transfer_block_t *)r->r[2]);
+
+        case BlockDevices_Reason_Write:
+            return mydriver_write(pw, r->r[9],
+                                   (transfer_block_t *)r->r[2]);
+
+        default:
+            return err_BadMiscOp;
+    }
+}
+</extended-example>
+</p>
+<p>
+When the underlying hardware is later removed, the driver deregisters the
+device it created for it:
+</p>
+<p>
+<extended-example type="c">
+void mydriver_remove(int device_id)
+{
+    _swix(BlockDevice_Deregister, _INR(0,0), device_id);
+}
+</extended-example>
+</p>
+</subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Gerph" address="gerph@gerph.org"/>
+ </maintainer>
+
+ <history>
+  <revision number="1" author="Gerph" date="26 Jul 2026"
+            title="Initial PRM-in-XML conversion">
+   <change>
+   Converted the module's client and driver-registration interfaces,
+   previously described in plain-text form, into PRM-in-XML, covering the
+   SWI interface, the driver entry point protocol, the service calls used
+   during device registration and deregistration, the star commands, and
+   the underlying device information and transfer block structures.
+   </change>
+  </revision>
+ </history>
+</meta>
+
+</riscos-prm>
