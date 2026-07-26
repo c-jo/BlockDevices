@@ -1,16 +1,20 @@
 ---
-# RISC OS CI build through build.riscos.online
+# RISC OS CI build using local 32-bit and 64-bit toolchains in the container,
+# with execution smoke tests run through build.riscos.online.
 #
 # To reuse this configuration with your own repository:
 #
-#   - Create a .robuild.yaml to describe what should be built on RISC OS.
-#       - `jobs.build.script` should be a list of commands to run on RISC OS
-#       - `jobs.build.artifacts.path` should be the directory to zip.
+#   - Update the Makefile references ('MakefilePyro') if your component uses
+#     a different filename.
+#   - Create a .robuild.yaml (32-bit) and .robuild64.yaml (64-bit) to
+#     RMLoad-test the built module - `jobs.build.script` should be a list
+#     of commands to run on RISC OS, and `jobs.build.artifacts.path` should
+#     be the directory to zip.
 #   - Create a VersionNum file if you wish to use the automated versioning
 #     in the same style as the RISC OS sources. [optional]
-#   - Update the 3rd step ('give the archive a versioned name') to give a
-#     suitable name for the archive.
-#   - Update the 4th step ('upload-artifacts') to include the same names.
+#   - Update the 'Give the output a versioned name' step to give a suitable
+#     name for the archive.
+#   - Update the 'upload-artifact' step to include the same name.
 #
 # The 'release' job is triggered when a tag starting with a 'v' is created,
 # which will create a GitHub release for the repository with the name of the
@@ -37,71 +41,164 @@ env:
 
 jobs:
   build-riscos:
-    # The type of runner that the job will run on
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    concurrency:
-      group: riscos-build-server
+    container:
+      image: gerph/riscos-build:latest-64bit
     outputs:
       version: ${{ steps.version.outputs.version }}
       leafname: ${{ steps.version.outputs.leafname }}
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - name: Obtain prerequisite build tool
+      - name: RISC OS 64-bit build
         run: |
-          # Fetch the build client
-          curl -s -L -o riscos-build-online https://github.com/gerph/robuild-client/releases/download/v0.07/riscos-build-online && chmod +x riscos-build-online
+          # There is no 64-bit ROM build yet (the 64-bit linker rejects the
+          # AOF output flag), so only the RAM module is built here.
+          riscos-amu -f MakefilePyro export BUILD64=1
+          riscos-amu -f MakefilePyro ram BUILD64=1
 
-      - name: Build through build.riscos.online
+      - name: RISC OS 32-bit build
         run: |
-          # Zip up the source to send to robuild
-          zip -q9r /tmp/source-archive.zip * .robuild.yaml
+          riscos-amu -f MakefilePyro export
+          riscos-amu -f MakefilePyro ram
+          riscos-amu -f MakefilePyro ram BUILD26=1 BUILD32=
+          riscos-amu -f MakefilePyro rom
+          riscos-amu -f MakefilePyro rom BUILD26=1 BUILD32=
 
-          # Send the archive file to build service (timeout of 60 seconds)
-          ./riscos-build-online -i /tmp/source-archive.zip -a off -t 60 -o /tmp/built
+      - name: Create archive of outputs
+        run: |
+          mkdir -p Artifacts/Lib/h
+          cp -R rm32 Artifacts/
+          cp -R rm Artifacts/
+          cp -R rm64 Artifacts/
+          cp -R aof32 Artifacts/
+          cp -R aof Artifacts/
+          cp "$BUILD_DIR/Export/C/h/${COMPONENT_NAME}" "Artifacts/Lib/h/${COMPONENT_NAME}"
+          cp LICENSE Artifacts/
+          cd Artifacts
+          riscos-zip ../"${COMPONENT_NAME}".zip *
 
       - name: Give the output a versioned name
         id: version
         run: |
           if [ -f VersionNum ] ; then
-              version=$(sed '/MajorVersion / ! d ; s/.*MajorVersion *"\(.*\)"/\1/' VersionNum)
+              version=$(awk -F'"' '/^#define Module_FullVersion[[:space:]]+"/ { print $2; exit }' VersionNum)
           else
               version=$(git rev-parse --short HEAD)
           fi
           echo "This is version: $version"
-          leafname="$COMPONENT_NAME-$version.zip"
-          if [ -f /tmp/built,a91 ] ; then
-              cp /tmp/built,a91 "$leafname"
-          else
-              echo "No archive was built?"
-              exit 1
-          fi
-          echo "version=$version" >> $GITHUB_OUTPUT
-          echo "leafname=$leafname" >> $GITHUB_OUTPUT
+          leafname="${COMPONENT_NAME}-$version.zip"
+          mv "${COMPONENT_NAME}".zip "$leafname"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "leafname=$leafname" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: RISCOS-build
           path: ${{ steps.version.outputs.leafname }}
-        # The artifact that is downloadable from the Actions is actually a zip of the artifacts
-        # that we supply. So it will be a regular Zip file containing a RISC OS Zip file.
+
+  build-docs:
+    runs-on: ubuntu-latest
+    outputs:
+      leafname: ${{ steps.docsversion.outputs.leafname }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build PRM-in-XML documentation
+        uses: gerph/riscos-prminxml-action@v1
+        with:
+          files: prminxml/${{ env.COMPONENT_NAME }}.xml
+          output: docs-output
+          pdf-generator: prince
+          style: prm
+
+      - name: Package documentation
+        id: docsversion
+        run: |
+          if [ -f VersionNum ] ; then
+              version=$(awk -F'"' '/^#define Module_FullVersion[[:space:]]+"/ { print $2; exit }' VersionNum)
+          else
+              version=$(git rev-parse --short HEAD)
+          fi
+          leafname="${COMPONENT_NAME}-Documentation-$version.zip"
+          cd docs-output && zip -q9r "../$leafname" *
+          echo "leafname=$leafname" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: RISCOS-Documentation
+          path: ${{ steps.docsversion.outputs.leafname }}
+
+  test-riscos-32:
+    needs: build-riscos
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: riscos-build-server
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Obtain prerequisite build tool
+        run: |
+          curl -s -L -o riscos-build-online https://github.com/gerph/robuild-client/releases/download/v0.07/riscos-build-online && chmod +x riscos-build-online
+
+      - name: Download built RISC OS binary
+        uses: actions/download-artifact@v8
+        with:
+          name: RISCOS-build
+
+      - name: RMLoad-test the 32-bit module through build.riscos.online
+        run: |
+          unzip -q "${{ needs.build-riscos.outputs.leafname }}" rm32/*
+          zip -q9r /tmp/source-archive.zip rm32 .robuild.yaml
+          ./riscos-build-online -A aarch32 -i /tmp/source-archive.zip -a off -t 60
+
+  test-riscos-64:
+    needs: build-riscos
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: riscos-build-server
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Obtain prerequisite build tool
+        run: |
+          curl -s -L -o riscos-build-online https://github.com/gerph/robuild-client/releases/download/v0.07/riscos-build-online && chmod +x riscos-build-online
+
+      - name: Download built RISC OS binary
+        uses: actions/download-artifact@v8
+        with:
+          name: RISCOS-build
+
+      - name: RMLoad-test the 64-bit module through build.riscos.online
+        run: |
+          unzip -q "${{ needs.build-riscos.outputs.leafname }}" rm64/*
+          cp .robuild64.yaml .robuild.yaml
+          zip -q9r /tmp/source-archive.zip rm64 .robuild.yaml
+          ./riscos-build-online -A aarch64 -i /tmp/source-archive.zip -a off -t 60
 
   # The release only triggers when the thing that was pushed was a tag starting with 'v'
   release:
-    needs: build-riscos
+    needs:
+      - build-riscos
+      - build-docs
+      - test-riscos-32
+      - test-riscos-64
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
     steps:
       - name: Download built RISC OS binary
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: RISCOS-build
+
+      - name: Download built documentation
+        uses: actions/download-artifact@v8
+        with:
+          name: RISCOS-Documentation
 
       - name: Create Release
         id: create_release
@@ -109,5 +206,5 @@ jobs:
         with:
           prerelease: false
           draft: true
-          artifacts: "${{ needs.build-riscos.outputs.leafname }}"
+          artifacts: "${{ needs.build-riscos.outputs.leafname }},${{ needs.build-docs.outputs.leafname }}"
           artifactContentType: application/zip

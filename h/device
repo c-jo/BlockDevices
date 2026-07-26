@@ -8,6 +8,8 @@
 #ifndef DEVICE_H
 #define DEVICE_H
 
+#include <stdint.h>
+
 #include "BlockDevices.h"
 
 typedef struct device_s {
@@ -54,7 +56,7 @@ void device_destroy(device_t *device);
  Returns:       pointer to an error block if failed
                 NULL if successful
  ******************************************************************/
-_kernel_oserror *device_transfer(device_t *device, unsigned int entry, unsigned long flags, transfer_block_t *block);
+_kernel_oserror *device_transfer(device_t *device, unsigned int entry, uint32_t flags, transfer_block_t *block);
 
 /*******************************************************************
  Function:      device_miscop

@@ -40,7 +40,7 @@ char *(strdup)(char const *x)
                n = number of CHARACTERS to copy
  Returns:      pointer to new string
  ******************************************************************/
-char *(strndup)(char const *str,int n)
+char *(strndup)(char const *str,size_t n)
 {
   char *s;
   if (str == NULL)
@@ -96,7 +96,7 @@ char *strdup_label(char const *x, const char *file, int line)
     }
     return dup;
 }
-char *strndup_label(char const *x, int n, const char *file, int line)
+char *strndup_label(char const *x, size_t n, const char *file, int line)
 {
     char *dup = strndup(x, n);
     if (dup)

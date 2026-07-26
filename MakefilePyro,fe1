@@ -27,14 +27,23 @@ EXPORTS    = ${EXP_C_H}.${COMPONENT}
 
 # Comma-separated list of paths to use for includes, such as:
 #	C:LibName.
-INCLUDES   = C:Asm.,C:LongLong.
-
+# libAsm (for _callx) and libLongLong (for the 64-bit-on-32-bit-compiler
+# emulation of UINT64) have no 64-bit builds. The 64-bit CLib provides
+# _callx directly, and the 64-bit compiler has a native uint64_t, so
+# neither library is needed (or available) when BUILD64=1.
 # Space separated list of libraries to link against.
 # (${CLIB} is implicit, unless NOCLIB = yes)
-LIBS       = C:Asm.o.libAsm
 
 # Space separated list of defines to set, eg -DDEBUG
+ifeq (${BUILD64},1)
+INCLUDES   =
+LIBS       =
+CDEFINES   = -DPYRO
+else
+INCLUDES   = C:Asm.,C:LongLong.
+LIBS       = C:Asm.o.libAsm
 CDEFINES   = -DUSE_LONG_LONG -DPYRO
+endif
 
 # Objects to build, using the format o.<name> (will be varied for build type)
 OBJS       = o.BlockDevicesHdr \
@@ -47,7 +56,7 @@ OBJS       = o.BlockDevicesHdr \
 # Documentation source files
 ifdef __crosscompile
 # Docs don't build on RISC OS yet
-DOCSRC = prminxml.blockdevices/xml
+DOCSRC = prminxml.BlockDevices/xml
 endif
 
 FORTIFY = no
